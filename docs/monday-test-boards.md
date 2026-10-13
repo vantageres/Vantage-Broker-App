@@ -65,8 +65,8 @@ Created by `scripts/seed_test_boards.py` on Oct 13, 2026. Item ids are in `docs/
 | Two people named Dave | Lead Dave Reyes, Contact Dave Morales |
 | Person in both Leads and Contacts | Maria Chen (different email on each) |
 | Unassigned record | Lead Tom Alvarez, Contact Helen Brooks |
-| Owned by another broker | Lead Ray Fulton, Contact Nina Patel, Properties New Kings Crossing, Property Lead 510 Main St (no broker yet) |
-| Co-Broker can edit | Lead Victor Ramos (John is Co-Broker, Contact Broker not set yet) |
+| Owned by another broker (Emily Stein) | Lead Ray Fulton, Contact Nina Patel, Properties New Kings Crossing, Property Lead 510 Main St |
+| Co-Broker can edit | Lead Victor Ramos (Emily is Contact Broker, John is Co-Broker) |
 | Two emails in one field | Lead Kevin O'Brien, Lead Dave Reyes (second address in the display text) |
 | Missing fields required for Qualified | Lead Sam Whitaker |
 | Ready to qualify | Lead Linda Park |
@@ -86,20 +86,13 @@ Created by `scripts/seed_test_boards.py` on Oct 13, 2026. Item ids are in `docs/
   - Vantage Leads Test: on Tom Alvarez (Source Sign, unassigned), Open Contact Date and Follow Up Date were reset by an automation.
   - Vantage Contacts Test: none.
 
+## Testers
+
+John Smyth tests first. Emily Stein (user 25374507) is the second broker: she owns records for the "not yours" tests and has been added to the five test boards.
+
 ## Issues found
 
-1. Link columns that still point at live boards after the Oct 13 fixes:
-   - Properties New Test: Leads → live Vantage Contacts; Back Office - Vouchers → live.
-   - Properties Test (old): Leads → live Vantage Contacts; link to Back Office and Vouchers → live; Leads/Deals → live Contacts subitems (and test); Silver Listing → live.
-   - Contacts Test subitems: Vantage Properties → live Vantage Properties (and test).
-   - Associated Properties points at Properties Test on Leads Test but at Properties New Test on Contacts Test.
-
-   Original list, before the fixes:
-   - Leads Test and Contacts Test, Associated Properties → live Vantage Properties.
-   - Property Leads Test, Vantage Contacts → live Vantage Contacts.
-   - Properties New Test, Property Owner, Leads, and the suite Deal Contact and Outside Broker → live Vantage Contacts.
-   - Properties Test (old), Property Owner and Leads → live Vantage Contacts. Leads/Deals → live and test Contacts subitems. Back Office, Vouchers, and Silver Listing → live boards.
-   - Contacts Test subitems, Vantage Properties → live and test Vantage Properties.
+1. Resolved Oct 13: every link column now points only at test boards. Contacts Test has Associated Properties → Properties Test (old) and a second link column → Properties New Test. Old property statuses were restored after the links were fixed, and no automations ran.
 2. Vantage Properties New Test has 3 fictional items with suites instead of a copy of the 18 live items.
 3. The Requirements subitem column set still exists on Contacts Test (to be retired).
 4. Property Type options differ on Property Leads (Office, Retail, Industrial/Flex, Land, Farm/Agricultural, Multifamily, Mixed-Use, Other) from Leads and Contacts.

@@ -21,6 +21,7 @@ PROPERTY_LEADS = "18435327149"
 TEST_BOARDS = {LEADS, CONTACTS, PROPS_OLD, PROPS_NEW, PROPERTY_LEADS}
 
 JOHN = 44432289
+EMILY = 25374507  # second broker; must be a subscriber on the test boards
 
 PLACES = {
     "Mount Laurel": ("39.9340", "-74.8910", "Mount Laurel, NJ, USA"),
@@ -124,8 +125,6 @@ def contact(name, business=None, contact_type=None, property_type=None, budget=N
     return name, cv
 
 
-# Records marked "other broker" are created without a Contact Broker until a
-# second broker is chosen for testing.
 LEAD_RECORDS = [
     # The spec's capture example. Requirement fields left empty on purpose.
     lead("Dave Reyes", business="Garrison Foods", status="Contacted", broker=JOHN,
@@ -159,11 +158,11 @@ LEAD_RECORDS = [
          em=email("kobrien@obrienhale.example",
                   "kobrien@obrienhale.example; kevin.obrien@mail.example"),
          source="Business Development", opened="2026-07-11"),
-    # Other broker (assigned later).
+    # Owned by another broker.
     lead("Ray Fulton", business="Fulton Logistics", contact_type="Leasee",
          property_type="Industrial", size="12,000 sf", where="Mount Laurel",
          notes="Target rent about $8.50/sf NNN, lease ends Q2 2027",
-         status="Contacted", ph="6095550152",
+         status="Contacted", broker=EMILY, ph="6095550152",
          em=email("ray@fultonlogistics.example"), source="Cold Call", opened="2026-05-03"),
     lead("Grace Kim", business="Kim Packaging", contact_type="Leasee",
          property_type="Industrial", size="30,000 to 40,000 sf", where="Pennsauken",
@@ -178,10 +177,10 @@ LEAD_RECORDS = [
          property_type="Retail", budget=650000, size="3,000 sf", where="Mount Laurel",
          status="Contacted", broker=JOHN, ph="8565550147",
          em=email("beth@sullivanbakery.example"), source="Website", opened="2026-09-18"),
-    # Other broker is Contact Broker (assigned later), John is Co-Broker.
+    # Emily is Contact Broker, John is Co-Broker.
     lead("Victor Ramos", business="Ramos Auto Group", contact_type="Leasee",
          property_type="Industrial", size="10,000 to 15,000 sf", where="Bellmawr",
-         status="Contacted", co_broker=JOHN, ph="8565550191",
+         status="Contacted", broker=EMILY, co_broker=JOHN, ph="8565550191",
          em=email("victor@ramosauto.example"), source="Referral", opened="2026-08-30"),
     lead("Jen Ortiz", business="Ortiz Fitness", contact_type="Leasee",
          property_type="Retail", size="5,000 to 8,000 sf", where="Mount Laurel",
@@ -210,10 +209,10 @@ CONTACT_RECORDS = [
             notes="Needs 2 dock doors, lease ends Q1 2027", broker=JOHN,
             ph="8565550158", em=email("marcus@bellfreight.example"), source="Cold Call",
             opened="2026-05-12"),
-    # Other broker (assigned later).
+    # Owned by another broker.
     contact("Nina Patel", business="Patel Pharmacy", contact_type="Leasee",
             property_type="Retail", size="2,500 sf", where="Moorestown",
-            ph="6095550144", em=email("nina@patelpharmacy.example"), source="Referral",
+            broker=EMILY, ph="6095550144", em=email("nina@patelpharmacy.example"), source="Referral",
             opened="2026-04-08"),
     contact("Owen Gray", business="Gray Family Properties", contact_type="Property Owner",
             property_type="Industrial", where="Cherry Hill", broker=JOHN,
@@ -272,9 +271,10 @@ PROPS_NEW_RECORDS = [
      [suite("Suite A", 15000, "On Market", "Industrial", 135000),
       suite("Suite B", 8000, "Lease Signed", "Industrial", 76000, "2028-06-30"),
       suite("Suite C", 20000, "On Market", "Industrial", 170000)]),
-    # Other broker (assigned later), to test hiding the sensitive fields.
+    # Owned by Emily, to test hiding the sensitive fields.
     ("Kings Crossing Retail Plaza - Haddonfield", {
         "status": label("Partially Leased"), "location": place("Haddonfield"),
+        "person": people(EMILY),
         "status_15": label("Lease"),
         **sensitive_new("Code 2290 at management office", "$2,100,000",
                         "Example Savings Bank, Chris Dunn, 609-555-0177")},
@@ -307,8 +307,8 @@ PROPERTY_LEAD_RECORDS = [
                   "Camden", "08002", "$12/sf NNN", "Industrial/Flex",
                   "Code 7781 side door", "$480,000",
                   "Example Bank, Dana Price, 856-555-0119", owner="Owen Gray"),
-    # Other broker (assigned later).
-    property_lead("510 Main St Office Condo - Moorestown", None, "Sale", "Moorestown",
+    # Owned by another broker.
+    property_lead("510 Main St Office Condo - Moorestown", EMILY, "Sale", "Moorestown",
                   "Burlington", "08057", "$625,000", "Office",
                   "Key at front desk", "$210,000",
                   "Example Credit Union, Lee Shaw, 609-555-0124"),
