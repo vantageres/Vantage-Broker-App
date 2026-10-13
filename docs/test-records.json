@@ -1,0 +1,41 @@
+{
+  "Leads": {
+    "Dave Reyes": "13282185024",
+    "Sam Whitaker": "13282110014",
+    "Linda Park": "13282122820",
+    "Maria Chen": "13282110217",
+    "Tom Alvarez": "13282110386",
+    "Kevin O'Brien": "13282122936",
+    "Ray Fulton": "13282112072",
+    "Grace Kim": "13282122634",
+    "Andre Wallace": "13282110178",
+    "Beth Sullivan": "13282162937",
+    "Victor Ramos": "13282110219",
+    "Jen Ortiz": "13282152885"
+  },
+  "Contacts": {
+    "Maria Chen": "13282121739",
+    "Dave Morales": "13282162896",
+    "Helen Brooks": "13282162732",
+    "Marcus Bell": "13282110023",
+    "Nina Patel": "13282141236",
+    "Owen Gray": "13282185091",
+    "Rachel Lin": "13282163004"
+  },
+  "Properties (old)": {
+    "1200 Commerce Pkwy - Mount Laurel": "13282112147",
+    "45 Kings Hwy E - Haddonfield": "13282112487",
+    "300 Corporate Center Dr - Mount Laurel": "13282152807",
+    "7 Industrial Ave - Pennsauken": "13282162314",
+    "Route 73 Parcel - Marlton": "13282110030"
+  },
+  "Properties New": {
+    "Garrison Business Center - Mount Laurel": "13282110264",
+    "Kings Crossing Retail Plaza - Haddonfield": "13282122962",
+    "Route 38 Flex Center - Moorestown": "13282162331"
+  },
+  "Property Leads": {
+    "22 Elm St Warehouse - Cherry Hill": "13282162772",
+    "510 Main St Office Condo - Moorestown": "13282110438"
+  }
+}

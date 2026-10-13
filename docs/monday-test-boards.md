@@ -55,15 +55,52 @@ Custom activity type **Broker Note**: `a087433e-74e8-45bb-9a91-a16346e18fbc`.
 | Current On Loan Payments | `boolean_mm6dhjh2` | `boolean_mm6v34ps` |
 | Lender Name & Contact Info | `text_mm6dwt85` | `text_mm6v4b1z` |
 
+## Test records
+
+Created by `scripts/seed_test_boards.py` on Oct 13, 2026. Item ids are in `docs/test-records.json`. All people, companies, phone numbers (555-01xx), and emails (.example) are fictional.
+
+| Scenario | Records |
+| --- | --- |
+| Capture example from the spec | Lead Dave Reyes (Garrison Foods), requirement fields left empty |
+| Two people named Dave | Lead Dave Reyes, Contact Dave Morales |
+| Person in both Leads and Contacts | Maria Chen (different email on each) |
+| Unassigned record | Lead Tom Alvarez, Contact Helen Brooks |
+| Owned by another broker | Lead Ray Fulton, Contact Nina Patel, Properties New Kings Crossing, Property Lead 510 Main St (no broker yet) |
+| Co-Broker can edit | Lead Victor Ramos (John is Co-Broker, Contact Broker not set yet) |
+| Two emails in one field | Lead Kevin O'Brien, Lead Dave Reyes (second address in the display text) |
+| Missing fields required for Qualified | Lead Sam Whitaker |
+| Ready to qualify | Lead Linda Park |
+| Summaries (industrial under 20k sf, near Mount Laurel) | Leads Ray Fulton, Grace Kim, Victor Ramos, Jen Ortiz, Beth Sullivan; Contacts Marcus Bell, Rachel Lin |
+| Property lookup and suites | 5 old Properties, 3 Properties New with 7 suites |
+| Sensitive fields | Filled on all Properties New and Property Leads records |
+| Property Lead linked to a Contact | 22 Elm St Warehouse → Owen Gray |
+
+## Monday behavior learned while seeding
+
+- The phone column stores digits only, so mixed formats only come from what brokers type.
+- The email column holds one address. A second address can only sit in the display text.
+- Automations on the test boards ran when records were created:
+  - Vantage Properties Test: every new item's Status was set to "Property Lead", and some items were moved to another group.
+  - Vantage Properties New Test: the parent Status changed to "On Market" after suites were added, so suite status appears to drive property status.
+  - Property Leads Test: Status "New Lead", GEN FOLDER LA "New", Date Created, County, and Zip Code were filled automatically.
+  - Vantage Leads Test: on Tom Alvarez (Source Sign, unassigned), Open Contact Date and Follow Up Date were reset by an automation.
+  - Vantage Contacts Test: none.
+
 ## Issues found
 
-1. Link columns on the test boards still point at live boards:
+1. Link columns that still point at live boards after the Oct 13 fixes:
+   - Properties New Test: Leads → live Vantage Contacts; Back Office - Vouchers → live.
+   - Properties Test (old): Leads → live Vantage Contacts; link to Back Office and Vouchers → live; Leads/Deals → live Contacts subitems (and test); Silver Listing → live.
+   - Contacts Test subitems: Vantage Properties → live Vantage Properties (and test).
+   - Associated Properties points at Properties Test on Leads Test but at Properties New Test on Contacts Test.
+
+   Original list, before the fixes:
    - Leads Test and Contacts Test, Associated Properties → live Vantage Properties.
    - Property Leads Test, Vantage Contacts → live Vantage Contacts.
    - Properties New Test, Property Owner, Leads, and the suite Deal Contact and Outside Broker → live Vantage Contacts.
    - Properties Test (old), Property Owner and Leads → live Vantage Contacts. Leads/Deals → live and test Contacts subitems. Back Office, Vouchers, and Silver Listing → live boards.
    - Contacts Test subitems, Vantage Properties → live and test Vantage Properties.
-2. Vantage Properties New Test has no items. The plan was to copy its 18 items with suites.
+2. Vantage Properties New Test has 3 fictional items with suites instead of a copy of the 18 live items.
 3. The Requirements subitem column set still exists on Contacts Test (to be retired).
 4. Property Type options differ on Property Leads (Office, Retail, Industrial/Flex, Land, Farm/Agricultural, Multifamily, Mixed-Use, Other) from Leads and Contacts.
 5. Automations can't be read through the API. They need a manual check in Monday.
