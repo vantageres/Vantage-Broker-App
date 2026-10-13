@@ -86,6 +86,13 @@ Created by `scripts/seed_test_boards.py` on Oct 13, 2026. Item ids are in `docs/
   - Vantage Leads Test: on Tom Alvarez (Source Sign, unassigned), Open Contact Date and Follow Up Date were reset by an automation.
   - Vantage Contacts Test: none.
 
+## Spike results (Oct 13, 2026)
+
+- **Broker Note:** `create_timeline_item` with the Broker Note activity id works on Contacts Test and the entry shows John Smyth as author. `delete_timeline_item` removes it. Test entry created and deleted on John Smyth's Contacts Test record.
+- **Follow-up automation:** the six-month Follow Up Date automation did not run on Contacts Test (no change after about a minute). It was most likely not copied with the board.
+- **Matching and rules:** `npm run try-capture` against the test boards gives the expected result for the Dave Reyes example, two Daves, Maria Chen on both boards, Emily's record (declined, owner named), and Tom Alvarez (claim offered). Loading both boards (20 records) takes about 1 second.
+- **Claude:** not yet run. The app needs Vantage's own Claude API key as a network secret for api.anthropic.com.
+
 ## Testers
 
 John Smyth tests first. Emily Stein (user 25374507) is the second broker: she owns records for the "not yours" tests and has been added to the five test boards.

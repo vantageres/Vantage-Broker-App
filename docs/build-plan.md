@@ -161,3 +161,8 @@ Speed tests on the full item counts run read-only against the live Leads and Con
 
 - Emails & Activities turned on for the test boards, with the Broker Note activity type available.
 - At least two broker seats with access to the test workspace, to test ownership and claiming.
+
+## New questions from the spike
+
+1. **Geocoding.** Desired Location is a map column, so saving "I-295, NJ" needs a latitude and longitude. That needs a geocoding service (for example Google Maps or Mapbox). This is a map lookup, not a data source, but it is an outside service and needs a decision.
+2. **Follow-up automation on test boards.** Add the six-month Follow Up Date automation to Contacts Test so the approval screen's automation warning can be tested.
