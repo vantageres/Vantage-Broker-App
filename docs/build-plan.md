@@ -112,12 +112,52 @@ No rebuild needed. The Operations Manager relaxes action types one at a time. Ad
 
 The approval card is the most important screen in the app. Start Claude Design on it in parallel with the Phase 0 spike, since the spike decides what data it shows but not how it looks.
 
-## Open questions for the build
+## Decisions (Oct 13, 2026)
 
-1. **Where approval settings live.** The Operations Manager controls them, but staff don't use the app. Options: a small admin page in the app, or a settings board in Monday that the app reads. A Monday board is simplest for the Operations Manager.
-2. **Claim race.** Monday has no conditional write. The app re-reads the owner just before saving, which narrows the race to well under a second but can't fully close it. Acceptable for v1?
-3. **Short-lived search cache.** Phone and email matching on 1,610 items may need a cache of a minute or two to hit the 5-second target. It would hold search keys only, not records. Acceptable under "no separate copy"?
-4. **Follow-up date on Leads.** The six-month follow-up automation was tested on Contacts only. Test on Leads in Phase 0.
-5. **Voice quality.** Is the phone's built-in dictation good enough, or do we add server transcription in Phase 3?
-6. **Test environment.** A duplicate workspace or test boards, so development never writes to live client records.
-7. **Model and data handling.** Confirm Vantage is comfortable sending client notes and Monday data to the Claude API (no training on API data by default).
+1. **Approval settings** live on an admin page in the app, used mainly from desktop. Only the Operations Manager can open it.
+2. **Claim race.** Accepted. The app re-reads the owner just before saving, and a small gap remains.
+3. **Session memory.** Search keys (names, phones, emails) and chat context are kept on the server for one chat session only, and are cleared after 10 minutes with no activity.
+4. **Claude API data handling.** Approved, on condition that the API account is set so that data is not used for training and is not stored. See "Claude API data settings" below.
+5. **Test boards.** The Operations Manager creates them in a separate workspace. See "Test boards" below.
+
+## Claude API data settings
+
+- Use the Claude API under Anthropic's commercial terms, which do not train on API inputs or outputs by default. Confirm no training or feedback opt-in is turned on in the Console's privacy settings.
+- Standard API accounts keep inputs and outputs for a limited period for safety review, then delete them. To have nothing stored, ask Anthropic sales for **Zero Data Retention (ZDR)** on the organization. Confirm the current retention period and ZDR terms with Anthropic before the pilot.
+- The app avoids API features that store data on Anthropic's side, such as the Files API and batch jobs. Photos are sent inline with each request.
+- The app logs nothing from prompts or answers in its own logs. Only request ids, timing, and errors are logged.
+
+## Test boards
+
+Create them in a separate workspace, for example "Broker App Test".
+
+| Board | How to create | Items |
+| --- | --- | --- |
+| Vantage Leads | Duplicate, structure only | About 20 fictional items |
+| Vantage Contacts | Duplicate, structure only | About 15 fictional items |
+| Property Leads | Duplicate, structure only | 2 or 3 fictional items |
+| Vantage Properties (old) | Duplicate, structure only | About 5 items, so the property links on test Leads and Contacts never touch live properties |
+| Vantage Properties New | Duplicate with items (only 18), including suite subitems | As copied |
+
+Speed tests on the full item counts run read-only against the live Leads and Contacts boards.
+
+**Automations need attention, because duplicating a board can copy automations that still point at live boards:**
+
+- Leads → Contacts on Qualified: repoint it to the **test** Contacts board.
+- Contacts follow-up date (about six months out): keep it on the test Contacts board, and add the same rule on test Leads if we want one there.
+- Property Leads: turn off Generate Property Folder and LA, and On Market, or repoint them to test targets, so they never create real folders, agreements, or listings. Note what LA Signed starts.
+- Test Leads and Contacts: point Associated Properties at the test Properties board.
+
+**Fictional items that cover the test scenarios:**
+
+- Two people named Dave with different companies.
+- One person who is in both Leads and Contacts.
+- One record with no Contact Broker (for claiming).
+- One record owned by a different broker (for the "not yours" response).
+- Phone numbers in mixed formats, and one field holding two email addresses.
+- One Lead missing some of the fields that Qualified requires.
+
+**Also needed:**
+
+- Emails & Activities turned on for the test boards, with the Broker Note activity type available.
+- At least two broker seats with access to the test workspace, to test ownership and claiming.
