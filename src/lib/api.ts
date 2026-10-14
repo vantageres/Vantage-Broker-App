@@ -13,5 +13,6 @@ export async function withBroker(handler: (ctx: Context, signedIn: SignedIn) => 
 
 export function fail(error: unknown, status = 502) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
+  console.error(`[api] ${status} ${message}`, error instanceof Error && "details" in error ? JSON.stringify((error as { details?: unknown }).details) : "");
   return NextResponse.json({ error: message }, { status });
 }

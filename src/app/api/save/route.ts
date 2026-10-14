@@ -20,6 +20,7 @@ export async function POST(req: Request) {
           { status: 502 },
         );
       }
+      console.error("[save] failed:", error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? "");
       return fail(new Error("Monday didn't respond, so nothing was saved. Your changes are kept here."));
     }
   });
