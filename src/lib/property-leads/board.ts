@@ -12,6 +12,7 @@ import {
 
 export interface LeadBoard {
   boardId: string;
+  files: string; // the Files column, for photos
   columns: Record<LeadField, string>;
   info: {
     broker: string; coBroker: string; coBroker2: string;
@@ -23,6 +24,7 @@ export interface LeadBoard {
 // Column ids read from Property Leads Test on Oct 14, 2026.
 export const TEST_PROPERTY_LEADS: LeadBoard = {
   boardId: "18435327149",
+  files: "file_mm83h46z",
   columns: {
     status: "status",
     listingType: "color_mkns3611",
@@ -193,6 +195,26 @@ export function leadColumnValue(board: LeadBoard, change: LeadChange, current: R
   }
 }
 
+// One Property Lead, read fresh just before a write, and only if the broker
+// is its Broker, Co-Broker or Co-Broker2.
+export async function readOwnedLead(monday: MondayClient, board: LeadBoard, me: Me, itemId: string, accountSlug: string): Promise<PropertyLeadRecord> {
+  const data = await monday.query<{ items: RawItem[] }>(
+    `query ($id: [ID!], $columns: [String!]) { items(ids: $id) { id name updated_at board { id } column_values(ids: $columns) { ${COLUMN_FIELDS} } } }`,
+    { id: [itemId], columns: allColumns(board) },
+  );
+  const item = data.items[0];
+  if (!item || item.board?.id !== board.boardId) throw new SaveRefused("That Property Lead no longer exists.");
+  const record = toLeadRecord(board, item, accountSlug);
+  if (!record.ownerIds.includes(me.id)) {
+    const owners = leadOwners(record) || "no one";
+    throw new SaveRefused(`This Property Lead belongs to ${owners}. Only its Broker, Co-Broker or Co-Broker2 can change it.`, owners);
+  }
+  return record;
+}
+
+export const leadOwners = (record: Pick<PropertyLeadRecord, "brokers">) =>
+  [record.brokers.broker, record.brokers.coBroker, record.brokers.coBroker2].filter(Boolean).join(", ");
+
 export interface LeadSaveResult {
   record: PropertyLeadRecord;
   changed: number;
@@ -210,19 +232,7 @@ export async function savePropertyLead(
   const known = new Set(FIELDS.map((f) => f.field));
   if (changes.some((c) => !known.has(c.field))) throw new SaveRefused("That field can't be changed from the app.");
 
-  // Read it fresh, just before the write.
-  const data = await monday.query<{ items: RawItem[] }>(
-    `query ($id: [ID!], $columns: [String!]) { items(ids: $id) { id name updated_at board { id } column_values(ids: $columns) { ${COLUMN_FIELDS} } } }`,
-    { id: [itemId], columns: allColumns(board) },
-  );
-  const item = data.items[0];
-  if (!item || item.board?.id !== board.boardId) throw new SaveRefused("That Property Lead no longer exists.");
-  const record = toLeadRecord(board, item, accountSlug);
-
-  if (!record.ownerIds.includes(me.id)) {
-    const owners = [record.brokers.broker, record.brokers.coBroker, record.brokers.coBroker2].filter(Boolean).join(", ") || "no one";
-    throw new SaveRefused(`This Property Lead belongs to ${owners}. Only its Broker, Co-Broker or Co-Broker2 can change it.`, owners);
-  }
+  const record = await readOwnedLead(monday, board, me, itemId, accountSlug);
   for (const c of changes) {
     if (!sameValue(record.values[c.field], c.from)) {
       throw new SaveRefused(`${fieldDef(c.field).label} was changed in Monday since you opened this (it's now "${record.values[c.field] || "empty"}"). Look it up again before changing it.`);

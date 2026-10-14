@@ -68,6 +68,12 @@ const MAX_PHOTOS = 2;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 const EXTENSION: Record<Photo["mediaType"], string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
+// A photo as a file for Monday: "photo-2026-10-14-1.jpg".
+export function photoFile(photo: Photo, i: number) {
+  const name = `photo-${new Date().toISOString().slice(0, 10)}-${i + 1}.${EXTENSION[photo.mediaType]}`;
+  return { name, type: photo.mediaType, data: Uint8Array.from(Buffer.from(photo.data, "base64")) };
+}
+
 // Photos arrive from the browser: check them before anything is saved.
 export function checkPhotos(photos: unknown): Photo[] {
   if (photos === undefined) return [];
@@ -259,8 +265,7 @@ async function afterFields(monday: MondayClient, board: PersonBoard, result: Sav
   for (const [i, photo] of photos.entries()) {
     try {
       if (!monday.uploadFile) throw new Error("No file upload");
-      const name = `photo-${new Date().toISOString().slice(0, 10)}-${i + 1}.${EXTENSION[photo.mediaType]}`;
-      await monday.uploadFile(result.itemId, board.columns.files, { name, type: photo.mediaType, data: Uint8Array.from(Buffer.from(photo.data, "base64")) });
+      await monday.uploadFile(result.itemId, board.columns.files, photoFile(photo, i));
     } catch {
       throw new NoteNotSaved(done, "photo");
     }

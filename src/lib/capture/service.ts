@@ -185,7 +185,7 @@ export const PROPERTY_LEADS_BOARD = TEST_PROPERTY_LEADS;
 
 // Property Leads is a private board: a broker who hasn't been added to it
 // gets nothing here rather than an error.
-async function propertyLeadsFor(ctx: Context): Promise<PropertyLeadRecord[]> {
+export async function propertyLeadsFor(ctx: Context): Promise<PropertyLeadRecord[]> {
   try {
     return await loadPropertyLeads(ctx.monday, PROPERTY_LEADS_BOARD, ctx.accountSlug);
   } catch (error) {

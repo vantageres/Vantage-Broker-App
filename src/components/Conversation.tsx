@@ -15,6 +15,8 @@ import { ProposalCard } from "./ProposalCard";
 import { LookupCard } from "./LookupCard";
 import { PropertyCard } from "./PropertyCard";
 import { PropertyLeadCard } from "./PropertyLeadCard";
+import { AttachCard } from "./AttachCard";
+import type { AttachCandidate } from "@/lib/attach";
 import { SummaryCard } from "./SummaryCard";
 import { Camera, Close, Out, Send } from "./icons";
 
@@ -26,6 +28,7 @@ type Entry =
   | { id: number; kind: "answer"; answer: LookupAnswer }
   | { id: number; kind: "property"; hit: PropertyHit }
   | { id: number; kind: "lead"; lead: PropertyLeadView }
+  | { id: number; kind: "attach"; photos: ShrunkPhoto[]; candidates: AttachCandidate[] }
   | { id: number; kind: "summary"; points: SummaryPoint[]; recordsRead: number };
 
 type Listed = { name: string; url: string; boardLabel: string };
@@ -43,6 +46,8 @@ export function Conversation({ firstName }: { firstName: string }) {
   // Photos waiting to be sent: a business card's front, and optionally its back.
   const [photos, setPhotos] = useState<ShrunkPhoto[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // The photos are for a record's Files, not a card or sign to read.
+  const [attachMode, setAttachMode] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
   // On a phone, the keyboard's microphone is how to talk instead of type.
   const [onPhone, setOnPhone] = useState(false);
@@ -68,6 +73,43 @@ export function Conversation({ firstName }: { firstName: string }) {
       setPhotoError((err as Error).message);
     }
     if (picker.current) picker.current.value = "";
+  }
+
+  // Attach photos to a record: find it by name, then the card asks for approval.
+  async function attachTo(question: string, withPhotos: ShrunkPhoto[]) {
+    if (!question.trim() || !withPhotos.length || busy) return;
+    setBusy(true);
+    const pendingId = nextId++;
+    setEntries((e) => [
+      ...e,
+      { id: nextId++, kind: "me", text: `Attach to: ${question}`, photos: withPhotos },
+      { id: pendingId, kind: "pending", text: "Finding the record…" },
+    ]);
+    setText("");
+    setPhotos([]);
+    setAttachMode(false);
+    const done = (entry: Entry) => setEntries((e) => [...e.filter((x) => x.id !== pendingId), entry]);
+    try {
+      const res = await fetch("/api/attach/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+      if (res.status === 401) {
+        window.location.href = "/signin";
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as { candidates?: AttachCandidate[]; error?: string };
+      if (!res.ok || !data.candidates) throw new Error(data.error ?? "Something went wrong.");
+      done(data.candidates.length
+        ? { id: nextId++, kind: "attach", photos: withPhotos, candidates: data.candidates }
+        : { id: nextId++, kind: "app", text: `I didn't find a Lead, Contact or Property Lead matching "${question}". Nothing was attached. Try the full name or the street address.` });
+    } catch (err) {
+      done({ id: nextId++, kind: "app", text: `${(err as Error).message} Nothing was attached.` });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submit() {
+    if (attachMode && photos.length) attachTo(text, photos);
+    else send(text, true, "auto", photos);
   }
 
   async function send(note: string, echo = true, mode: Mode = "auto", withPhotos: ShrunkPhoto[] = []) {
@@ -242,6 +284,8 @@ export function Conversation({ firstName }: { firstName: string }) {
               return <PropertyCard key={entry.id} hit={entry.hit} />;
             case "lead":
               return <PropertyLeadCard key={entry.id} lead={entry.lead} />;
+            case "attach":
+              return <AttachCard key={entry.id} photos={entry.photos} candidates={entry.candidates} />;
             case "summary":
               return <SummaryCard key={entry.id} points={entry.points} recordsRead={entry.recordsRead} />;
             case "proposal":
@@ -257,16 +301,24 @@ export function Conversation({ firstName }: { firstName: string }) {
               <span className="photo-thumb" key={i}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.preview} alt={i ? "Back" : "Front"} />
-                <button type="button" aria-label={`Remove the ${i ? "back" : "front"}`} onClick={() => setPhotos((all) => all.filter((_, j) => j !== i))}><Close /></button>
+                <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => setPhotos((all) => { const left = all.filter((_, j) => j !== i); if (!left.length) setAttachMode(false); return left; })}><Close /></button>
               </span>
             ))}
-            {photos.length === 1 && (
+            {photos.length === 1 && !attachMode && (
               <button type="button" className="link-btn" onClick={() => picker.current?.click()}>Add the back (optional)</button>
+            )}
+            {photos.length === 1 && attachMode && (
+              <button type="button" className="link-btn" onClick={() => picker.current?.click()}>Add another photo</button>
+            )}
+            {photos.length > 0 && (
+              <button type="button" className="link-btn" onClick={() => setAttachMode((m) => !m)}>
+                {attachMode ? "Read it as a card or sign instead" : "Attach to a record instead"}
+              </button>
             )}
             {photoError && <p className="inline-msg bad" role="alert">{photoError}</p>}
           </div>
         )}
-        <form className="composer" onSubmit={(e) => { e.preventDefault(); send(text, true, "auto", photos); }}>
+        <form className="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           {/* The phone offers Take Photo or Photo Library; a computer opens a file picker. */}
           <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
           <button className="round-btn camera" type="button" aria-label="Add a photo" disabled={busy || photos.length >= 2} onClick={() => picker.current?.click()}><Camera /></button>
@@ -275,17 +327,17 @@ export function Conversation({ firstName }: { firstName: string }) {
             <textarea
               rows={1}
               value={text}
-              placeholder={photos.length ? "Add a note (optional)…" : "Notes or a question…"}
+              placeholder={attachMode && photos.length ? "Which record? e.g. 22 Elm St" : photos.length ? "Add a note (optional)…" : "Notes or a question…"}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(min-width: 900px)").matches) {
                   e.preventDefault();
-                  send(text, true, "auto", photos);
+                  submit();
                 }
               }}
             />
           </label>
-          <button className="round-btn send" type="submit" aria-label="Send" disabled={(!text.trim() && !photos.length) || busy}><Send /></button>
+          <button className="round-btn send" type="submit" aria-label="Send" disabled={(attachMode ? !text.trim() : !text.trim() && !photos.length) || busy}><Send /></button>
         </form>
         <p className="composer-hint">Enter to send · Shift + Enter for a new line</p>
       </div>
