@@ -232,7 +232,7 @@ A real save to Linda Park (Leads Test) wrote Notes, Follow Up Date and the Broke
 3. The computer runs a fresh Monday sign-in made for the phone, using the same return address as normal sign-in, so the Monday app's settings don't change. The new sign-in must be the same Monday user as the computer's.
 4. The phone checks every few seconds and signs itself in. The code works once. Five wrong codes from one computer stop further tries for 10 minutes.
 
-The phone has its own Monday sign-in, separate from the computer's, and stays signed in the usual way (30 days, renewed while in use). While waiting for the phone, its Monday tokens sit in the store sealed with the session secret, for at most 10 minutes. Computers still sign in with Monday directly; on a phone, "Try Monday sign-in on this phone" remains as a small link. Logic is in `src/lib/link.ts`.
+The phone has its own Monday sign-in, separate from the computer's, and stays signed in the usual way (30 days, renewed while in use). While waiting for the phone, its Monday tokens sit in the store sealed with the session secret, for at most 10 minutes. Computers still sign in with Monday directly; on a phone, "Try Monday sign-in on this phone" remains as a small link. Logic is in `src/lib/link.ts`. Confirmed on John's iPhone on the live site; the computer's own sign-in carried on working.
 
 **Next slices:** model comparison (see "Claude model for capture").
 
