@@ -258,7 +258,29 @@ When nothing is named and nothing is found, the reply now says what can be asked
 
 **Photos confirmed (Oct 14):** John tried a business card, a sign, and attaching a photo to a contact and a property on his iPhone against the live site; all worked.
 
-**Next slices:** model comparison (needs `BROKER_APP_ANTHROPIC_KEY`) (see "Claude model for capture").
+**Model (John, Oct 14):** stay on Opus 5.5 for capture and summaries for now; the comparison can wait.
+
+## Pilot readiness (survey of the live boards, Oct 14, read only)
+
+| Board | Live id | Workspace | Items | Columns vs test |
+| --- | --- | --- | --- | --- |
+| Vantage Leads | 8842865081 | Main | 1,216 | all 24 ids match |
+| Vantage Contacts | 8842962019 | Main | 406 | 23 of 24 match (see below) |
+| Vantage Properties (old) | 5076736644 | Main | 402 | all 45 match |
+| Vantage Properties New | 18420767182 | Brokerage | 18 | all 108 match |
+| Property Leads | 18420767300 | Brokerage | 5 | all 110 match |
+
+Moving the app to the live boards is mostly a change of board ids. Found:
+
+1. **Speed.** Loading all 1,622 live Leads and Contacts takes about 11 seconds (6 seconds with only the matching columns); the test boards took 1 second. Lookups reload them every time and capture once per chat session, so lookups would take 11+ seconds against a 5-second target. Asking Monday to search by name (items_page with query rules) answers in under half a second. Summaries: 1,560 of the 1,622 records have some requirement detail, too many to send to Claude, so they need narrowing in code first.
+2. **A second Property Leads board.** Property Leads in the Brokerage workspace (18420767300, 5 items, the spec's count) and another in the Main workspace (8637648844, 3 items). The plan assumes the Brokerage one.
+3. **Private boards.** Properties New (Brokerage) has only John subscribed, and Property Leads (Brokerage) only John and Emily. Brokers read through their own sign-in, so pilot brokers must be added to both or property searches and Property Leads show them nothing.
+4. **Edit permissions.** Leads and Property Leads allow everyone to edit (spec: align to assigned people). Contacts and Properties New already limit editing to assignees.
+5. **Requirements subitem.** One live Contact still has subitems; the subitem is still to retire.
+6. **Stray columns.** Live Contacts has an empty, unconnected column "link to Vantage Properties New Test" (board_relation_mm8378e5) that can be deleted. Properties New Test's "Back Office - Vouchers" link column points at the live Vouchers board (5024344343).
+7. **Broker Note** is an account-wide activity type (same id), so it works on the live boards.
+
+**Next slices:** pilot readiness (see above) (see "Claude model for capture").
 
 **Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.
 

@@ -52,9 +52,10 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - LA Signed stays settable, with the short warning "This moves the listing into marketing."
 7. **Voice and tap-to-call** (built Oct 14). Voice is the keyboard's dictation, with check marks on phone, email and amount, dictation rules in the capture prompt, and a tip on phones. Phone numbers and emails in lookups are tappable. John to try on his iPhone: dictate a note with a phone number and email, and tap Linda Park's number.
 8. **Photos** (plan agreed Oct 14; see `build-plan.md`). All three steps are built: business cards, signs (with the phone's location and a property link), and attaching a photo to a record. Tried locally on Dave Reyes and 22 Elm St (both restored afterwards). Confirmed by John on his iPhone (Oct 14): a business card, a sign, and attaching a photo to a contact and a property all worked.
-9. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
-10. **John's decisions and setup:**
+9. **Pilot readiness** (started Oct 14; see `build-plan.md`, "Pilot readiness"). Live boards surveyed read only. Main issue: loading all live Leads and Contacts takes about 11 seconds, so lookups and capture matching need Monday-side search before the switch. Waiting on John for the decisions and Monday changes listed there.
+10. **Model comparison** (on hold; John chose to stay on Opus 5.5 for now): Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
+11. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - A Vantage domain later.
-11. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
+12. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
