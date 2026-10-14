@@ -49,4 +49,4 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - A Vantage domain later.
-7. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, property and listing searches, summaries.
+7. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, listings that fit a person's requirement, vantageres.com listings, "what changed this week". Property search and requirement summaries are done (item 4).
