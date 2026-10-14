@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askKind, isQuestion } from "./question";
+import { askKind, asksForListings, isQuestion } from "./question";
 import { findMentioned } from "./search";
 import { TEST_BOARDS } from "../monday/boards";
 import type { PersonRecord } from "../monday/records";
@@ -102,4 +102,11 @@ describe("askKind", () => {
     ["What do we have on Garrison Foods?", "record"],
     ["Linda Park?", "record"],
   ])("%s → %s", (q, kind) => expect(askKind(q)).toBe(kind));
+});
+
+describe("asksForListings", () => {
+  it.each(["Any listings for Ray Fulton?", "What fits Marcus Bell?", "Properties for Rachel Lin", "Is there space available for Grace Kim?", "Show options for Garrison Foods"])
+    ("listings: %s", (q) => expect(asksForListings(q)).toBe(true));
+  it.each(["What properties are linked to Owen Gray?", "What do we have on Ray Fulton?", "Linda Park?"])
+    ("record: %s", (q) => expect(asksForListings(q)).toBe(false));
 });

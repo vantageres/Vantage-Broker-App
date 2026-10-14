@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describeQuery, knownTowns, readQuery, searchProperties } from "./search";
+import { describeQuery, knownTowns, queryFromRequirement, readQuery, searchProperties } from "./search";
+import { propertyIntro } from "./intro";
 import { TEST_PROPERTY_BOARDS, toPropertyRecord, type PropertyRecord } from "../monday/properties";
 
 // The test boards' properties (scripts/seed_test_boards.py), as Monday returns them.
@@ -99,5 +100,53 @@ describe("searching properties and suites", () => {
 
   it("finds nothing rather than something close", () => {
     expect(search("office around 50,000 sf")).toEqual([]);
+  });
+});
+
+describe("listings that fit a person's requirement", () => {
+  const req = (r: Partial<Parameters<typeof queryFromRequirement>[0]>) =>
+    queryFromRequirement({ propertyType: "", size: "", contactType: "", desiredLocation: "", budget: "", notes: "", ...r }, towns);
+
+  it("turns Ray Fulton's requirement into a search", () => {
+    const r = req({ propertyType: "Industrial", size: "12,000 sf", contactType: "Leasee", desiredLocation: "Mount Laurel, NJ, USA", notes: "Target rent about $8.50/sf NNN" });
+    expect(r.query).toEqual({ types: ["Industrial"], size: { min: 9000, max: 15000, unit: "sf", around: 12000 }, deal: "Lease", availableOnly: true, towns: ["Mount Laurel"] });
+    expect(r).toMatchObject({ missing: [], notChecked: ["Notes"], place: "Mount Laurel" });
+    expect(searchProperties(PROPERTIES, r.query).map((h) => h.suites.map((s) => s.name))).toEqual([["Suite A"]]);
+  });
+
+  it("reads ranges, bare numbers, acres and buyers", () => {
+    expect(req({ size: "30,000 to 40,000 sf" }).query.size).toMatchObject({ min: 30000, max: 40000 });
+    expect(req({ size: "12000" }).query.size).toMatchObject({ around: 12000, unit: "sf" });
+    expect(req({ size: "4 acres", contactType: "Buyer" }).query).toMatchObject({ size: { around: 4, unit: "acres" }, deal: "Sale" });
+    expect(req({ propertyType: "Healthcare, Office" }).query.types).toEqual(["Healthcare", "Office"]);
+  });
+
+  it("reports what the record lacks instead of guessing", () => {
+    expect(req({ contactType: "Not Set" })).toMatchObject({ missing: ["Property Type", "Sq Ft/Acres", "Desired Location"], query: { types: [], size: null, deal: null } });
+  });
+
+  it("knows a town with no listings isn't a filter", () => {
+    expect(req({ desiredLocation: "Bellmawr, NJ, USA" })).toMatchObject({ place: "Bellmawr", query: { towns: [] } });
+  });
+});
+
+describe("the line above a property answer", () => {
+  const base = { kind: "properties" as const, hits: [], more: [], searched: 8 };
+  const person = { name: "Marcus Bell", url: "u", boardLabel: "Contact", missing: [], notChecked: ["Notes"], place: "Bellmawr", elsewhere: true };
+  const hit = searchProperties(PROPERTIES, readQuery("industrial 18,000 sf"))[0];
+
+  it("says when nothing was in the town asked for", () => {
+    expect(propertyIntro({ ...base, hits: [hit], understood: "available · Industrial · about 18,000 sf (13,500 to 22,500) · for lease", for: person }))
+      .toBe("One available listing fits Marcus Bell's requirement (Contact): available · Industrial · about 18,000 sf (13,500 to 22,500) · for lease. None are in Bellmawr, so these are elsewhere. Not checked: Notes.");
+  });
+
+  it("says when nothing fits anywhere", () => {
+    expect(propertyIntro({ ...base, understood: "available · Industrial · 30,000 to 40,000 sf · for lease · in Pennsauken", for: { ...person, name: "Grace Kim", boardLabel: "Lead", notChecked: [], place: "Pennsauken Township", elsewhere: false } }))
+      .toBe("No available listings fit Grace Kim's requirement (Lead): available · Industrial · 30,000 to 40,000 sf · for lease · in Pennsauken. Nothing fits anywhere else either.");
+  });
+
+  it("asks for the missing fields rather than guessing", () => {
+    expect(propertyIntro({ ...base, understood: "", for: { ...person, name: "Dave Reyes", boardLabel: "Lead", missing: ["Property Type", "Sq Ft/Acres"], elsewhere: false } }))
+      .toBe("Dave Reyes has no Property Type and Sq Ft/Acres in Monday, so I can't match listings without guessing. Add them to the Lead first.");
   });
 });

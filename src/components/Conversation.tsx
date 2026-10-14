@@ -7,6 +7,7 @@ import type { LookupAnswer } from "@/lib/lookup/details";
 import type { SummaryPoint } from "@/lib/lookup/summary";
 import type { PropertyHit } from "@/lib/property/search";
 import { isQuestion } from "@/lib/lookup/question";
+import { propertyIntro } from "@/lib/property/intro";
 import { ProposalCard } from "./ProposalCard";
 import { LookupCard } from "./LookupCard";
 import { PropertyCard } from "./PropertyCard";
@@ -98,13 +99,13 @@ export function Conversation({ firstName }: { firstName: string }) {
       const result = data as LookupResult;
 
       if (result.kind === "properties") {
-        const total = result.hits.length + result.more.length;
-        if (total === 0) {
-          done({ id: nextId++, kind: "app", text: `No properties in Monday match ${result.understood}. I searched all ${result.searched} on Properties New and Properties (old).`, asNote: question });
-          return;
-        }
+        const p = result.for;
         done(
-          { id: nextId++, kind: "app", text: `${total === 1 ? "One property matches" : `${total} properties match`}: ${result.understood}.${result.more.length ? ` The first ${result.hits.length} are below.` : ""}`, asNote: question },
+          {
+            id: nextId++, kind: "app", text: propertyIntro(result), asNote: question,
+            // A person's requirement links to their record.
+            more: p ? [{ name: p.name, url: p.url, boardLabel: p.boardLabel }] : undefined,
+          },
           ...result.hits.map((hit) => ({ id: nextId++, kind: "property" as const, hit })),
           ...(result.more.length ? [{ id: nextId++, kind: "app" as const, text: "Also matching:", more: result.more }] : []),
         );

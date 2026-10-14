@@ -37,6 +37,14 @@ const ACROSS = /\b(summari[sz]e|summary|overview|who|which|how many|list|any)\b/
 // About buildings and space.
 const ABOUT_PROPERTY = /\b(propert(y|ies)|listings?|space|spaces|suites?|units?|buildings?|sites?|parcels?|sf|sq\.?\s?ft|square f(ee|oo)t|acres?|for (lease|sale)|available|vacant|warehouses?|storefronts?|inventory)\b/i;
 
+// With a Lead or Contact named: does the question ask for listings that fit
+// them ("Any listings for Ray Fulton?"), rather than for their record? Asking
+// which properties are linked to them is still a record lookup.
+const FIT = /\b(listings?|propert(y|ies)|spaces?|suites?|buildings?|options?|fits?|fitting|match(es|ing)?|available|inventory|show(ing)?s?)\b/i;
+export function asksForListings(question: string): boolean {
+  return FIT.test(question) && !/\b(linked|associated|attached|connected)\b/i.test(question);
+}
+
 export function askKind(question: string): AskKind {
   if (ABOUT_PEOPLE.test(question) && (ACROSS.test(question) || /\b(requirements?|clients?|leads|contacts)\b/i.test(question))) return "summary";
   if (ABOUT_PROPERTY.test(question)) return "property";

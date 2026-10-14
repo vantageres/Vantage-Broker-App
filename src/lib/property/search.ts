@@ -109,6 +109,41 @@ export function readQuery(question: string, towns: string[] = []): PropertyQuery
   };
 }
 
+// A Lead's or Contact's requirement as a search for available listings.
+// Uses only what the record holds; a missing type or size is reported, never
+// filled in. Budget and Notes aren't searchable and are listed as not checked.
+export interface Requirement {
+  propertyType: string;
+  size: string;
+  contactType: string;
+  desiredLocation: string;
+  budget: string;
+  notes: string;
+}
+
+export interface RequirementSearch {
+  query: PropertyQuery;
+  missing: string[]; // requirement fields that are empty in Monday
+  notChecked: string[]; // filled in Monday, but not something listings can be searched by
+  place: string; // the town asked for, as the record has it ("" when none)
+}
+
+export function queryFromRequirement(req: Requirement, towns: string[]): RequirementSearch {
+  const types = req.propertyType.split(",").map((t) => t.trim()).filter(Boolean)
+    .map((t) => TYPE_WORDS.find(([re]) => re.test(` ${t.toLowerCase()} `))?.[1] ?? t);
+  // A bare number ("12000") is square feet, as on the boards.
+  const size = req.size.trim() ? readSize(` ${req.size.toLowerCase()} sf `) : null;
+  const deal = /lease/i.test(req.contactType) ? "Lease" : /buyer/i.test(req.contactType) ? "Sale" : null;
+  const place = req.desiredLocation.split(",")[0]?.trim() ?? "";
+  const where = req.desiredLocation.toLowerCase();
+  return {
+    query: { types: [...new Set(types)], size, deal, availableOnly: true, towns: towns.filter((t) => where.includes(t.toLowerCase())) },
+    missing: [!types.length && "Property Type", !size && "Sq Ft/Acres", !place && "Desired Location"].filter((x): x is string => !!x),
+    notChecked: [req.budget.trim() && "Budget", req.notes.trim() && "Notes"].filter((x): x is string => !!x),
+    place,
+  };
+}
+
 export function hasFilters(query: PropertyQuery): boolean {
   return query.types.length > 0 || !!query.size || !!query.deal || query.availableOnly || query.towns.length > 0;
 }

@@ -9,10 +9,10 @@ import { Extraction, extractPeople, type ExtractedPerson } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal } from "./proposal";
 import { findMentioned } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
-import { askKind } from "../lookup/question";
+import { askKind, asksForListings } from "../lookup/question";
 import { summarize, type SummaryPoint } from "../lookup/summary";
 import { TEST_PROPERTY_BOARDS, loadProperties } from "../monday/properties";
-import { describeQuery, hasFilters, knownTowns, readQuery, searchProperties, type PropertyHit } from "../property/search";
+import { describeQuery, hasFilters, knownTowns, queryFromRequirement, readQuery, searchProperties, type PropertyHit } from "../property/search";
 
 // The boards the app works on. Only the test boards until cutover.
 export const BOARDS: Record<"leads" | "contacts", PersonBoard> = TEST_BOARDS;
@@ -117,6 +117,16 @@ export type LookupResult =
       hits: PropertyHit[];
       more: { name: string; url: string; boardLabel: string }[];
       searched: number; // properties read from Monday
+      // Set when the search is a person's requirement ("Any listings for Ray Fulton?").
+      for?: {
+        name: string;
+        url: string;
+        boardLabel: string;
+        missing: string[]; // requirement fields empty in Monday
+        notChecked: string[]; // filled, but not searchable (Budget, Notes)
+        place: string; // the town the record asks for
+        elsewhere: boolean; // nothing fit in that town, so these are from anywhere
+      };
     }
   | { kind: "summary"; points: SummaryPoint[]; recordsRead: number };
 
@@ -126,8 +136,11 @@ const PROPERTIES_SHOWN = 12;
 
 export const PROPERTY_BOARDS = TEST_PROPERTY_BOARDS;
 
+const loadAllProperties = async (ctx: Context) =>
+  (await Promise.all(Object.values(PROPERTY_BOARDS).map((b) => loadProperties(ctx.monday, b, ctx.accountSlug)))).flat();
+
 async function propertySearch(ctx: Context, question: string): Promise<LookupResult> {
-  const properties = (await Promise.all(Object.values(PROPERTY_BOARDS).map((b) => loadProperties(ctx.monday, b, ctx.accountSlug)))).flat();
+  const properties = await loadAllProperties(ctx);
   const query = readQuery(question, knownTowns(properties));
   const hits = searchProperties(properties, query);
   return {
@@ -136,6 +149,34 @@ async function propertySearch(ctx: Context, question: string): Promise<LookupRes
     hits: hits.slice(0, PROPERTIES_SHOWN),
     more: hits.slice(PROPERTIES_SHOWN).map(({ property: p }) => ({ name: p.name, url: p.url, boardLabel: p.boardLabel })),
     searched: properties.length,
+  };
+}
+
+// Available listings that fit a Lead's or Contact's requirement. When none
+// are in the town they want, the same search runs everywhere and says so.
+async function listingsFor(ctx: Context, record: PersonRecord): Promise<LookupResult> {
+  const properties = await loadAllProperties(ctx);
+  const { query, missing, notChecked, place } = queryFromRequirement(record.current, knownTowns(properties));
+  const person = { name: record.name, url: record.url, boardLabel: record.board.label, missing, notChecked, place };
+  if (query.types.length === 0 && !query.size) {
+    return { kind: "properties", understood: "", hits: [], more: [], searched: properties.length, for: { ...person, elsewhere: false } };
+  }
+  let hits = searchProperties(properties, query);
+  // The town is a preference: nothing there (or no listing in that town at all) widens to everywhere.
+  const inTown = !place || query.towns.length > 0;
+  let elsewhere = false;
+  if (place && (!inTown || hits.length === 0)) {
+    const anywhere = searchProperties(properties, { ...query, towns: [] });
+    elsewhere = anywhere.length > 0;
+    if (elsewhere || !inTown) hits = anywhere;
+  }
+  return {
+    kind: "properties",
+    understood: describeQuery(elsewhere ? { ...query, towns: [] } : query),
+    hits: hits.slice(0, PROPERTIES_SHOWN),
+    more: hits.slice(PROPERTIES_SHOWN).map(({ property: p }) => ({ name: p.name, url: p.url, boardLabel: p.boardLabel })),
+    searched: properties.length,
+    for: { ...person, elsewhere },
   };
 }
 
@@ -150,6 +191,9 @@ export async function lookup(ctx: Context, question: string): Promise<LookupResu
   const hits = findMentioned(question, records);
   const kind = askKind(question);
   const named = hits.length > 0 && hits[0].strength === "strong";
+  // One person named (Maria Chen in Leads and Contacts is still one person).
+  const onePerson = named && new Set(hits.map((h) => h.record.name.toLowerCase())).size === 1;
+  if (onePerson && asksForListings(question)) return listingsFor(ctx, hits[0].record);
 
   if (!named && kind === "summary") {
     const relevant = records.filter(hasRequirement);

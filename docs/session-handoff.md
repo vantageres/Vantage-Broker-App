@@ -46,9 +46,10 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 3. **Phone sign-in from a computer** (built Oct 14; see `build-plan.md`, "Signing in a phone"). Confirmed by John on the live site: his iPhone signed in with a code entered at `/link`, and the computer stayed signed in (a second Monday sign-in for the same user doesn't end the first).
 4. **Property search and summaries:** confirmed by John on the live site Oct 14. The retail 2,000 sf question found 45 Kings Hwy E and Kings Crossing Suite 102 in about two seconds. Summaries linked the right records and took about 5 seconds, which John finds acceptable. A short search without a question mark ("Available industrial 15 to 20k sf") was read as a note; fixed in `question.ts`.
    - John turned off some test-board automations on Oct 14 and will adapt them once the app works; the Follow Up Date questions are on hold.
-5. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
-6. **John's decisions and setup:**
+5. **Listings that fit a person** (built Oct 14; see `build-plan.md`). Tried against the test boards from John's PC. John to try on the live site: "Any listings for Ray Fulton?", "What fits Marcus Bell?", "Any listings for Dave Reyes?".
+6. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
+7. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - A Vantage domain later.
-7. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, listings that fit a person's requirement, vantageres.com listings, "what changed this week". Property search and requirement summaries are done (item 4).
+8. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, vantageres.com listings, "what changed this week". Property search, requirement summaries and listings for a person are done (items 4 and 5).

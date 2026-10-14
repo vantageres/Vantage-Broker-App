@@ -10,6 +10,7 @@
 import { mondayClient } from "../src/lib/monday/client";
 import { whoAmI } from "../src/lib/monday/me";
 import { lookup } from "../src/lib/capture/service";
+import { propertyIntro } from "../src/lib/property/intro";
 
 const question = process.argv.slice(2).join(" ").trim();
 if (!question) {
@@ -24,7 +25,7 @@ const result = await lookup({ monday, sid: "try-lookup", accountSlug: who.accoun
 const ms = Date.now() - started;
 
 if (result.kind === "properties") {
-  console.log(`Properties: ${result.understood} — ${result.hits.length + result.more.length} of ${result.searched} match (${ms} ms)`);
+  console.log(`${propertyIntro(result)} (${ms} ms)`);
   for (const { property: p, suites, otherSuites } of result.hits) {
     console.log(`\n${p.name} [${p.boardLabel}] ${p.status} · ${p.types.join(", ") || "no type"} · ${p.deal} · ${p.sqft ?? "-"} sf · ${p.acres ?? "-"} acres · price ${p.price ?? "-"} · ${p.brokers}`);
     for (const s of suites) console.log(`  ${s.name}: ${s.sqft ?? "-"} sf · ${s.type} · ${s.status} · ${s.deal} · lease value ${s.leaseValue ?? "-"} · expires ${s.expires || "-"}`);
