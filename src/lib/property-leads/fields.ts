@@ -65,8 +65,10 @@ export function sameValue(a: string, b: string): boolean {
 
 // What a status change will start, said on the approval card.
 export function statusNote(to: string): string | null {
-  // Seen on Property Leads Test, Oct 14, 2026: within about 30 seconds of LA Signed.
-  if (to === "LA Signed") return "LA Signed starts Monday's marketing automations: about 30 seconds after saving, Monday adds the 11-step marketing checklist as subitems, moves this lead to Pre-Listing, and changes Status to In Marketing with today's In Marketing Date.";
-  // Not yet tried on the test board, so nothing is promised.
-  return `Monday may start automations when Status changes to ${to}; this hasn't been tried yet. Check the lead in Monday afterwards.`;
+  // LA Signed starts Monday's marketing automations (seen on Property Leads Test,
+  // Oct 14, 2026: checklist subitems, Pre-Listing group, Status In Marketing).
+  // Brokers get one plain line, at John's request.
+  if (to === "LA Signed") return "This moves the listing into marketing.";
+  // Other statuses haven't been tried on the test board, so nothing is promised.
+  return "Monday may update this listing after the change.";
 }

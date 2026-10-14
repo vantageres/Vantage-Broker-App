@@ -48,7 +48,8 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - John turned off some test-board automations on Oct 14 and will adapt them once the app works; the Follow Up Date questions are on hold.
 5. **Listings that fit a person** (built Oct 14; see `build-plan.md`). Tried against the test boards from John's PC. John to try on the live site: "Any listings for Ray Fulton?", "What fits Marcus Bell?", "Any listings for Dave Reyes?".
 6. **Property Leads lookup and edit** (built Oct 14; see `build-plan.md`). Tried in the local app against Property Leads Test: lookup, sensitive fields hidden on Emily's 510 Main St, refusals (not assigned, changed meanwhile, Monday-only status), and a real save.
-   - **22 Elm St is not restored yet.** The LA Signed test set off Monday's marketing automations: Status is now In Marketing, LA Signed and In Marketing Date are Oct 14, the lead is in the Pre-Listing group, and it has 11 checklist subitems. Waiting for John to say how to clean up (or to keep it as is), and whether LA Signed stays settable from the app.
+   - **Keep 22 Elm St as it is** (John, Oct 14). The LA Signed test set off Monday's marketing automations: Status In Marketing, LA Signed and In Marketing Date Oct 14, Pre-Listing group, 11 checklist subitems. Don't restore it unless he asks.
+   - LA Signed stays settable, with the short warning "This moves the listing into marketing."
 7. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
 8. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.

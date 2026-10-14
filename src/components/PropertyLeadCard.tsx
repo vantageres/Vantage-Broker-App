@@ -188,7 +188,7 @@ export function PropertyLeadCard({ lead: initial }: { lead: PropertyLeadView }) 
       ))}
 
       {status.kind === "failed" && <div className="alert" role="alert" style={{ margin: "0 12px 12px" }}>{status.message}</div>}
-      {status.kind === "saved" && <p className="inline-msg" role="status" style={{ padding: "0 16px" }}>Saved {status.changed} change{status.changed === 1 ? "" : "s"} to Monday. The values above are what Monday holds now.{status.automations ? " Monday's automations may change them further in the next minute; look it up again to see." : ""}</p>}
+      {status.kind === "saved" && <p className="inline-msg" role="status" style={{ padding: "0 16px" }}>Saved {status.changed} change{status.changed === 1 ? "" : "s"} to Monday. The values above are what Monday holds now.{status.automations ? " Monday may update it further in the next minute." : ""}</p>}
 
       {changes.length > 0 ? (
         <div className="card-foot">
