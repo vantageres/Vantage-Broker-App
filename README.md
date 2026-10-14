@@ -31,7 +31,7 @@ Development only (ignored in production):
 ## Checks
 
 ```
-npm test          # rules, matching, saving, memory, approvals, sign-in renewal
+npm test          # rules, matching, saving, lookups, memory, approvals, sign-in renewal
 npm run typecheck
 npx next build
 npm run try-capture -- "a note"   # a note against the test boards, read only

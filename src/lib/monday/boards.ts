@@ -30,6 +30,8 @@ export interface PersonBoard {
   };
   // Label used when Contact Type has no value.
   contactTypeUnset: string;
+  // Link columns to the property boards, shown in lookups.
+  propertyLinks: string[];
 }
 
 export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
@@ -54,6 +56,7 @@ export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
       status: "color_mkpme1c1",
     },
     contactTypeUnset: "Not Set",
+    propertyLinks: ["board_relation_mkr7eesb"],
   },
   contacts: {
     key: "contacts",
@@ -75,6 +78,7 @@ export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
       source: "label7",
     },
     contactTypeUnset: "Not Labeled",
+    propertyLinks: ["connect_boards7", "board_relation_mm839kb1"],
   },
 };
 

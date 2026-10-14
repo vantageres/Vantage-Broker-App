@@ -7,6 +7,8 @@ import { IdleCache } from "../memory";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { Extraction, extractPeople, type ExtractedPerson } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal } from "./proposal";
+import { findMentioned } from "../lookup/search";
+import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 
 // The boards the app works on. Only the test boards until cutover.
 export const BOARDS: Record<"leads" | "contacts", PersonBoard> = TEST_BOARDS;
@@ -87,6 +89,29 @@ export async function resolve(
   const record = records.find((r) => r.board.key === choice.board && r.id === choice.id);
   if (!record) throw new Error("That record wasn't found. It may have been moved or deleted.");
   return withMap(proposalFor(person, record, ctx.me, noteText, today, ["your choice"]));
+}
+
+export interface LookupResult {
+  answers: LookupAnswer[];
+  // Further matches, listed by name only.
+  more: { board: "leads" | "contacts"; boardLabel: string; id: string; name: string; url: string }[];
+  // True when the only hits were a first name, last name or business word.
+  partial: boolean;
+}
+
+const DETAILED = 3;
+const LISTED = 10;
+
+// Lookups read Monday when asked, never the cached copy.
+export async function lookup(ctx: Context, question: string): Promise<LookupResult> {
+  forgetRecords(ctx.sid);
+  const hits = findMentioned(question, await recordsFor(ctx.monday, ctx.sid, ctx.accountSlug));
+  const answers = await Promise.all(hits.slice(0, DETAILED).map((h) => lookupAnswer(ctx.monday, h.record, ctx.accountSlug)));
+  return {
+    answers,
+    more: hits.slice(DETAILED, DETAILED + LISTED).map(({ record: r }) => ({ board: r.board.key, boardLabel: r.board.label, id: r.id, name: r.name, url: r.url })),
+    partial: hits.length > 0 && hits[0].strength === "weak",
+  };
 }
 
 export async function findPlace(place: string) {
