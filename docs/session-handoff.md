@@ -40,10 +40,11 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 ## Next work, in order
 
 1. **Notes in lookups:** confirmed Oct 14. After signing in again with `updates:read`, John sees the notes section with no error line.
-2. **Service worker** for the installed app. Built Oct 14 (`public/sw.js`, offline page `public/offline.html`). Tried locally with `next build && next start`: it registers, caches only the shell files, and shows the offline page when the server is down. John to check on a phone: install, turn on airplane mode, open the app.
-3. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
-4. **John's decisions and setup:**
+2. **Service worker** for the installed app. Built Oct 14 (`public/sw.js`, offline page `public/offline.html`). Tried locally with `next build && next start`: it registers, caches only the shell files, and shows the offline page when the server is down. Confirmed by John on his iPhone: the offline page shows in airplane mode and the app returns afterwards.
+3. **Phone sign-in from a computer** (built Oct 14; see `build-plan.md`, "Signing in a phone"). John to test on the live site: phone shows a code, computer at `/link` enters it, phone signs in. Also check the computer is still signed in afterwards (a second Monday sign-in for the same user might end the first one; not yet known).
+4. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
+5. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - A Vantage domain later.
-5. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, property and listing searches, summaries.
+6. **Phase 3** (spec): voice, photos, Property Leads lookup and edit, property and listing searches, summaries.

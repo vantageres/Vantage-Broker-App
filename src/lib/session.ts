@@ -18,6 +18,9 @@ export interface BrokerSession {
   expiresAt?: number;
   oauthState?: string;
   pkceVerifier?: string;
+  returnTo?: string; // where to go after signing in (a path in this app)
+  linkId?: string; // phone: the pairing it is waiting on (see link.ts)
+  linkPairing?: string; // computer: the pairing its Monday sign-in is for
 }
 
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
@@ -64,6 +67,22 @@ export function applyTokens(session: BrokerSession, tokens: Tokens) {
   session.token = tokens.accessToken;
   session.refreshToken = tokens.refreshToken ?? session.refreshToken;
   session.expiresAt = tokens.expiresAt;
+}
+
+// Monday tokens waiting in the store for a phone (see link.ts) are sealed with
+// the session secret, so the store never holds them in the clear.
+export function sealTokens(tokens: Tokens): Promise<string> {
+  return sealData(tokens, { password: sessionOptions().password as string, ttl: 15 * 60 });
+}
+
+export async function unsealTokens(sealed: string): Promise<Tokens | null> {
+  const tokens = await unsealData<Tokens>(sealed, { password: sessionOptions().password as string, ttl: 15 * 60 });
+  return tokens?.accessToken ? tokens : null; // an expired seal opens empty
+}
+
+// A path in this app, never another site.
+export function safePath(next: string | null | undefined): string {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
 }
 
 // One renewal at a time per sign-in, across every server copy (see renewal.ts).

@@ -225,6 +225,15 @@ A real save to Linda Park (Leads Test) wrote Notes, Follow Up Date and the Broke
 
 **Service worker (Oct 14):** The installed app has an offline shell (`public/sw.js`, registered in production only). It keeps a small offline page, the logo and the icons. Pages still load from the network every time; when the network can't be reached, the broker sees "You're offline" with Try again instead of the browser's error, and the page reloads when the connection returns. It never caches pages, `/api` answers or Monday data, and never handles `/api` or non-GET requests, so capture, lookups and saving stay online only. To change the shell, edit the files and bump `CACHE` in `sw.js`; old caches are deleted when the new worker starts.
 
+**Signing in a phone (Oct 14):** On an iPhone, Monday's sign-in page shows "come back on desktop or download the app" instead of a login form, and the Monday phone app's sign-in can't be used by other apps. Monday staff have said this sign-in flow isn't supported on mobile. So a phone is signed in from a computer, the way TV apps link an account:
+
+1. On the phone, the sign-in screen offers "Sign in with your computer" and shows an 8-character code (e.g. `VBYX-FW2V`) that works for 10 minutes.
+2. On a computer, the broker opens `/link`, signs in with Monday if needed, and enters the code. The step is a form post that checks the request comes from the app, so another site can't start it.
+3. The computer runs a fresh Monday sign-in made for the phone, using the same return address as normal sign-in, so the Monday app's settings don't change. The new sign-in must be the same Monday user as the computer's.
+4. The phone checks every few seconds and signs itself in. The code works once. Five wrong codes from one computer stop further tries for 10 minutes.
+
+The phone has its own Monday sign-in, separate from the computer's, and stays signed in the usual way (30 days, renewed while in use). While waiting for the phone, its Monday tokens sit in the store sealed with the session secret, for at most 10 minutes. Computers still sign in with Monday directly; on a phone, "Try Monday sign-in on this phone" remains as a small link. Logic is in `src/lib/link.ts`.
+
 **Next slices:** model comparison (see "Claude model for capture").
 
 **Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.

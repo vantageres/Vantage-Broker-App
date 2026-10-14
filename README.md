@@ -28,6 +28,8 @@ Development only (ignored in production):
 | `MONDAY_DEV_PROXY_AUTH=1` | Shows "Development sign-in", which signs in as the owner of the environment's Monday token (added by the cloud environment's network secret). |
 | `DEV_EXTRACTION_FILE` | A saved extraction (JSON) used instead of calling Claude, to try the screens without a Claude key. |
 
+Phones sign in from a computer: Monday's sign-in page doesn't work in a phone browser, so the phone shows a code and the broker enters it at `/link` on a computer (see `src/lib/link.ts`).
+
 ## Checks
 
 ```

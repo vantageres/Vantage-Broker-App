@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { brokerForPage, devProxyAuth } from "@/lib/session";
+import { SignInChoices } from "@/components/SignInChoices";
 
 const ERRORS: Record<string, string> = {
   state: "That sign-in link expired. Please try again.",
@@ -16,7 +17,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
       <p>Sign in with your Monday account. Changes you approve are saved to Monday as you.</p>
       {error && <p className="inline-msg bad" role="alert">{ERRORS[error] ?? "Sign-in failed. Please try again."}</p>}
       {detail && <p className="inline-msg" style={{ maxWidth: 320, overflowWrap: "anywhere" }}>Details: {detail}</p>}
-      <a className="approve" href="/api/auth/login">Sign in with Monday</a>
+      <SignInChoices />
       {devProxyAuth() && (
         <form method="post" action="/api/auth/dev" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
           <button className="secondary" type="submit">Development sign-in</button>

@@ -184,6 +184,15 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .signin p { margin: 0; color: var(--muted); max-width: 320px; line-height: 1.5; }
 .signin .approve { width: 100%; max-width: 320px; text-decoration: none; display: flex; align-items: center; justify-content: center; }
 .signin .secondary { width: 100%; max-width: 320px; }
+.signin .text-link { background: none; border: 0; padding: 8px; color: var(--navy); font-size: 15px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.signin .link-btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.signin .link-shown { font-size: 34px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.signin .link-form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
+.signin .link-code {
+  height: 56px; border: 1px solid var(--control); border-radius: 14px; background: #fff; color: var(--ink);
+  font: inherit; font-size: 24px; font-weight: 800; letter-spacing: 0.08em; text-align: center; text-transform: uppercase;
+}
+.signin .link-code:focus { outline: 2px solid var(--navy); outline-offset: 1px; }
 
 /* Approval settings (desktop first) */
 .admin { flex: 1; width: 100%; max-width: 880px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
