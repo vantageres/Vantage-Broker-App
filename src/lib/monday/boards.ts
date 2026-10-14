@@ -2,6 +2,10 @@
 // The test workspace ids come from docs/monday-test-boards.md. Live ids are
 // added at cutover; nothing else in the app hard-codes an id.
 
+// The Vantage Monday account's web address, used for "Open in Monday" links.
+// Fixed, so sign-in doesn't need the account:read scope to look it up.
+export const MONDAY_ACCOUNT_SLUG = process.env.MONDAY_ACCOUNT_SLUG ?? "vantage-real-estate-services";
+
 export type PersonBoardKey = "leads" | "contacts";
 
 export interface PersonBoard {
