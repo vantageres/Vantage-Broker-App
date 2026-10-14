@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isQuestion } from "./question";
+import { askKind, isQuestion } from "./question";
 import { findMentioned } from "./search";
 import { TEST_BOARDS } from "../monday/boards";
 import type { PersonRecord } from "../monday/records";
@@ -14,6 +14,8 @@ describe("isQuestion", () => {
     "Show me Dave Reyes",
     "Linda Park?",
     "Is Linda still looking?",
+    "Summarize open industrial requirements under 20k sf.",
+    "List retail space in Haddonfield",
   ])("asks: %s", (t) => expect(isQuestion(t)).toBe(true));
 
   it.each([
@@ -78,4 +80,18 @@ describe("showPhone", () => {
     expect(showPhone("+1 856 555 0123")).toBe("(856) 555-0123");
     expect(showPhone("+44 20 7946 0958")).toBe("+44 20 7946 0958");
   });
+});
+
+describe("askKind", () => {
+  it.each([
+    ["Can you summarize the retail properties we have in the 2,000 sq. ft. size?", "property"],
+    ["Any listings for lease in Mount Laurel?", "property"],
+    ["What industrial space is available around 15k sf?", "property"],
+    ["Summarize open industrial requirements under 20k sf.", "summary"],
+    ["Who is looking near Mount Laurel?", "summary"],
+    ["Which clients need warehouse space?", "summary"],
+    ["How many leads want retail?", "summary"],
+    ["What do we have on Garrison Foods?", "record"],
+    ["Linda Park?", "record"],
+  ])("%s → %s", (q, kind) => expect(askKind(q)).toBe(kind));
 });

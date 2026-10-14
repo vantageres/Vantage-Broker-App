@@ -234,6 +234,14 @@ A real save to Linda Park (Leads Test) wrote Notes, Follow Up Date and the Broke
 
 The phone has its own Monday sign-in, separate from the computer's, and stays signed in the usual way (30 days, renewed while in use). While waiting for the phone, its Monday tokens sit in the store sealed with the session secret, for at most 10 minutes. Computers still sign in with Monday directly; on a phone, "Try Monday sign-in on this phone" remains as a small link. Logic is in `src/lib/link.ts`. Confirmed on John's iPhone on the live site; the computer's own sign-in carried on working.
 
+**Property search and summaries (Oct 14, pulled forward from Phase 3 at John's request):** A question now gets one of three answers, all read only:
+
+1. **A record** when it names a Lead or Contact (as before), whatever else it says.
+2. **A summary** when it asks across people's requirements ("Who is looking near Mount Laurel?", "Summarize open industrial requirements under 20k sf"). Claude (Opus 5.5, low effort, server-side fallback) reads one line per Lead and Contact with requirement details: names, business, requirement fields, status, follow-up date, Contact Broker, last updated. No phones or emails are sent. Every point must cite its records; points citing no real record are dropped in code. The card links each point to its records.
+3. **A property search** when it asks about properties, space, sizes or listings ("retail around 2,000 sf", "available industrial 15 to 20k sf in Mount Laurel", "land for sale"). Done in code, without Claude: both property boards are read fresh, and the question is read for type, size (a single size means a quarter either side), town, sale or lease, and "available". The answer says what it understood ("Retail · about 2,000 sf (1,500 to 2,500)"). Properties New is searched by suite; the old board by property. A property with no size or type in Monday is left out of a search on that, never guessed. The sensitive columns are never requested.
+
+When nothing is named and nothing is found, the reply now says what can be asked. Column ids for the property boards come from `scripts/seed_test_boards.py` (`src/lib/monday/properties.ts`). Still to come: listings that fit a person's requirement, vantageres.com, Property Leads in searches, "what changed this week" (needs the activity log), and narrowing records in code before a summary once the live boards (about 1,600 records) are used.
+
 **Next slices:** model comparison (see "Claude model for capture").
 
 **Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.

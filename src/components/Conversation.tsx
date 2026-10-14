@@ -4,17 +4,27 @@ import { useEffect, useRef, useState } from "react";
 import type { Proposal } from "@/lib/capture/proposal";
 import type { LookupResult } from "@/lib/capture/service";
 import type { LookupAnswer } from "@/lib/lookup/details";
+import type { SummaryPoint } from "@/lib/lookup/summary";
+import type { PropertyHit } from "@/lib/property/search";
 import { isQuestion } from "@/lib/lookup/question";
 import { ProposalCard } from "./ProposalCard";
 import { LookupCard } from "./LookupCard";
+import { PropertyCard } from "./PropertyCard";
+import { SummaryCard } from "./SummaryCard";
 import { Out, Send } from "./icons";
 
 type Entry =
   | { id: number; kind: "me"; text: string }
-  | { id: number; kind: "app"; text: string; retry?: string; asNote?: string; more?: LookupResult["more"] }
+  | { id: number; kind: "app"; text: string; retry?: string; asNote?: string; more?: Listed[] }
   | { id: number; kind: "pending"; text: string }
   | { id: number; kind: "proposal"; proposal: Proposal }
-  | { id: number; kind: "answer"; answer: LookupAnswer };
+  | { id: number; kind: "answer"; answer: LookupAnswer }
+  | { id: number; kind: "property"; hit: PropertyHit }
+  | { id: number; kind: "summary"; points: SummaryPoint[]; recordsRead: number };
+
+type Listed = { name: string; url: string; boardLabel: string };
+
+const NOTHING_FOUND = "I didn't find a Lead or Contact in Monday that matches. You can ask about a person or business by name, about properties (“retail around 2,000 sf in Haddonfield”), or across requirements (“Who is looking near Mount Laurel?”).";
 
 type Mode = "auto" | "note";
 
@@ -84,11 +94,34 @@ export function Conversation({ firstName }: { firstName: string }) {
         window.location.href = "/signin";
         return;
       }
-      if (!res.ok || !data.answers || !data.more) throw new Error(data.error ?? "Something went wrong.");
-      const { answers, more, partial } = data as LookupResult;
+      if (!res.ok || !data.kind) throw new Error(data.error ?? "Something went wrong.");
+      const result = data as LookupResult;
+
+      if (result.kind === "properties") {
+        const total = result.hits.length + result.more.length;
+        if (total === 0) {
+          done({ id: nextId++, kind: "app", text: `No properties in Monday match ${result.understood}. I searched all ${result.searched} on Properties New and Properties (old).`, asNote: question });
+          return;
+        }
+        done(
+          { id: nextId++, kind: "app", text: `${total === 1 ? "One property matches" : `${total} properties match`}: ${result.understood}.${result.more.length ? ` The first ${result.hits.length} are below.` : ""}`, asNote: question },
+          ...result.hits.map((hit) => ({ id: nextId++, kind: "property" as const, hit })),
+          ...(result.more.length ? [{ id: nextId++, kind: "app" as const, text: "Also matching:", more: result.more }] : []),
+        );
+        return;
+      }
+
+      if (result.kind === "summary") {
+        done(result.points.length
+          ? { id: nextId++, kind: "summary", points: result.points, recordsRead: result.recordsRead }
+          : { id: nextId++, kind: "app", text: `No Lead or Contact in Monday answers that. I read all ${result.recordsRead} with requirements.`, asNote: question });
+        return;
+      }
+
+      const { answers, more, partial } = result;
       const total = answers.length + more.length;
       if (total === 0) {
-        done({ id: nextId++, kind: "app", text: "I didn't find a Lead or Contact in Monday that matches. Try the person's full name or the business name.", asNote: question });
+        done({ id: nextId++, kind: "app", text: NOTHING_FOUND, asNote: question });
         return;
       }
       const intro = total === 1
@@ -112,7 +145,7 @@ export function Conversation({ firstName }: { firstName: string }) {
     <>
       <main className="thread" aria-live="polite">
         {entries.length === 0 && (
-          <p className="empty">Hi {firstName}. Type what happened, and I&apos;ll propose the changes for Monday. Nothing is saved until you approve. You can also ask what Monday has on someone.</p>
+          <p className="empty">Hi {firstName}. Type what happened, and I&apos;ll propose the changes for Monday. Nothing is saved until you approve. You can also ask what Monday has on someone, search properties, or ask who is looking for what.</p>
         )}
         {entries.map((entry) => {
           switch (entry.kind) {
@@ -127,7 +160,7 @@ export function Conversation({ firstName }: { firstName: string }) {
                   {entry.more && (
                     <ul className="more-list">
                       {entry.more.map((m) => (
-                        <li key={`${m.board}:${m.id}`}><a href={m.url} target="_blank" rel="noreferrer">{m.name} <span className="chip" style={{ fontSize: 11, padding: "2px 8px" }}>{m.boardLabel.toUpperCase()}</span> <Out /></a></li>
+                        <li key={m.url}><a href={m.url} target="_blank" rel="noreferrer">{m.name} <span className="chip" style={{ fontSize: 11, padding: "2px 8px" }}>{m.boardLabel.toUpperCase()}</span> <Out /></a></li>
                       ))}
                     </ul>
                   )}
@@ -141,6 +174,10 @@ export function Conversation({ firstName }: { firstName: string }) {
               );
             case "answer":
               return <LookupCard key={entry.id} answer={entry.answer} />;
+            case "property":
+              return <PropertyCard key={entry.id} hit={entry.hit} />;
+            case "summary":
+              return <SummaryCard key={entry.id} points={entry.points} recordsRead={entry.recordsRead} />;
             case "proposal":
               return <ProposalCard key={entry.id} proposal={entry.proposal} onReplace={(p) => replace(entry.id, p)} />;
           }
