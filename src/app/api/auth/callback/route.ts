@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { getSession } from "@/lib/session";
+import { applyTokens, getSession } from "@/lib/session";
 import { exchangeCode } from "@/lib/monday/oauth";
 import { mondayClient } from "@/lib/monday/client";
 import { whoAmI } from "@/lib/monday/me";
@@ -10,13 +10,15 @@ export async function GET(req: Request) {
   const session = await getSession();
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (!code || !state || state !== session.oauthState) {
+  const verifier = session.pkceVerifier;
+  if (!code || !state || !verifier || state !== session.oauthState) {
     return NextResponse.redirect(new URL("/signin?error=state", url));
   }
   try {
-    const token = await exchangeCode(code);
-    const who = await whoAmI(mondayClient(token));
-    Object.assign(session, who, { token, sid: randomBytes(16).toString("hex"), oauthState: undefined });
+    const tokens = await exchangeCode(code, verifier);
+    const who = await whoAmI(mondayClient(tokens.accessToken));
+    applyTokens(session, tokens);
+    Object.assign(session, who, { sid: randomBytes(16).toString("hex"), oauthState: undefined, pkceVerifier: undefined });
     await session.save();
     return NextResponse.redirect(new URL("/", url));
   } catch {

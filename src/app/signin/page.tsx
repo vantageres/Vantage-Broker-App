@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { devProxyAuth, requireBroker } from "@/lib/session";
+import { brokerForPage, devProxyAuth } from "@/lib/session";
 
 const ERRORS: Record<string, string> = {
   state: "That sign-in link expired. Please try again.",
@@ -7,7 +7,7 @@ const ERRORS: Record<string, string> = {
 };
 
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (await requireBroker()) redirect("/");
+  if ((await brokerForPage()).kind !== "signed-out") redirect("/");
   const { error } = await searchParams;
   return (
     <main className="signin">

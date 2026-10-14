@@ -1,11 +1,9 @@
-import { redirect } from "next/navigation";
-import { requireBroker } from "@/lib/session";
+import { pageBroker } from "@/lib/page-broker";
 import { TopBar } from "@/components/TopBar";
 import { Conversation } from "@/components/Conversation";
 
 export default async function Home() {
-  const signedIn = await requireBroker();
-  if (!signedIn) redirect("/signin");
+  const signedIn = await pageBroker("/");
   return (
     <div className="shell">
       <TopBar />

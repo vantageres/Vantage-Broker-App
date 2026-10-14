@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireBroker } from "@/lib/session";
+import { pageBroker } from "@/lib/page-broker";
 import { BOARDS, itemUrl } from "@/lib/capture/service";
 import { savedToday } from "@/lib/monday/saved-today";
 import { startOfTodayInNewJersey, timeInNewJersey } from "@/lib/time";
@@ -7,8 +6,7 @@ import { BackBar } from "@/components/TopBar";
 import { Out } from "@/components/icons";
 
 export default async function SavedToday() {
-  const signedIn = await requireBroker();
-  if (!signedIn) redirect("/signin");
+  const signedIn = await pageBroker("/saved");
   const { session, monday } = signedIn;
 
   let items: Awaited<ReturnType<typeof savedToday>> = [];

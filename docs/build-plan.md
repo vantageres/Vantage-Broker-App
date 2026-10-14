@@ -224,3 +224,5 @@ A real save to Linda Park (Leads Test) wrote Notes, Follow Up Date and the Broke
 **Finding:** on Leads Test, adding a Broker Note sets Last Contact, and a Monday automation then resets Follow Up Date to a week out and changes Open Contact Date. It overwrote the date the broker approved. The approval card now warns about it. Decision needed: change the automation (e.g. only set Follow Up Date when it is empty), or keep it.
 
 **Next slices:** lookups on Leads and Contacts; approval settings page (needs the hosting and database decision); service worker for the installed app; Monday OAuth app and hosting set-up.
+
+**Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.
