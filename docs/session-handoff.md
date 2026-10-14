@@ -36,6 +36,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 - Claude data settings: no training, no retention (see `build-plan.md`).
 - Write only to the test workspace "Broker App Test" (`18004807`). Live boards are read only.
 - Undo test saves afterwards: reset Linda Park and delete any test Broker Notes.
+  - Exception (Oct 14): John asked to keep Linda Park as she is after his capture test (Leasee, Healthcare and Office, 2,500 sf, $6,000, Moorestown, follow-up Oct 20, plus his Broker Note). Don't reset her unless he asks. His note says 2,000 sq ft and the field says 2,500 sf; not yet confirmed whether he edited it on the proposal.
 - Users: John Smyth `44432289` (tester and Operations Manager), Emily Stein `25374507` (second broker).
 
 ## Next work, in order
