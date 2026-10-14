@@ -73,6 +73,9 @@ export interface Proposal {
   // Asked one at a time, in this order. The approval screen shows the first.
   questions: { field: string; question: string }[];
   automations: string[];
+  // The record's current Property Type, so answers and edits add to it
+  // instead of silently replacing it.
+  currentPropertyType?: string;
 }
 
 export interface Broker {
@@ -278,7 +281,10 @@ export function proposalFor(
     // then resets Follow Up Date (a week out) and Open Contact Date.
     automations.push("Saving a note on a Lead starts a Monday automation that resets Follow Up Date to a week out and changes Open Contact Date, replacing any date set here.");
   }
-  return { ...base, target, changes: diff(values, record), questions: openQuestions, automations };
+  return {
+    ...base, target, changes: diff(values, record), questions: openQuestions, automations,
+    currentPropertyType: record.current.propertyType || undefined,
+  };
 }
 
 export function buildProposal(

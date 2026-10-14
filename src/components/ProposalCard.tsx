@@ -322,6 +322,7 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
           total={totalQuestions}
           field={question.field}
           text={question.question}
+          initial={question.field === "propertyType" ? valueOf("propertyType")?.value ?? proposal.currentPropertyType ?? "" : ""}
           onAnswer={(edit) => answer(question.i, question.field, edit)}
           onSkip={() => answer(question.i)}
         />
@@ -401,7 +402,28 @@ function FieldEditor({ field, initial, onDone, onCancel }: { field: string; init
   );
 }
 
+// Property Type holds several types. Each is a checkbox, with the current
+// ones ticked, so keeping or removing a type is always the broker's choice.
+function PropertyTypePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const chosen = value.split(",").map((t) => t.trim()).filter(Boolean);
+  const toggle = (t: string) => {
+    const next = chosen.includes(t) ? chosen.filter((x) => x !== t) : [...chosen, t];
+    onChange(PROPERTY_TYPES.filter((p) => next.includes(p)).join(", "));
+  };
+  return (
+    <div className="choices" role="group" aria-label="Property Type">
+      {PROPERTY_TYPES.map((t) => (
+        <label key={t} className="choice" style={{ display: "flex", alignItems: "center", gap: 8, textTransform: "none", letterSpacing: 0 }}>
+          <input type="checkbox" checked={chosen.includes(t)} onChange={() => toggle(t)} />
+          {t}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function FieldInput({ field, value, onChange }: { field: string; value: string; onChange: (v: string) => void }) {
+  if (field === "propertyType") return <PropertyTypePicker value={value} onChange={onChange} />;
   const options = field === "contactType" ? CONTACT_TYPES : field === "source" ? SOURCES : null;
   if (options) {
     return (
@@ -415,8 +437,7 @@ function FieldInput({ field, value, onChange }: { field: string; value: string; 
   if (field === "notes") return <textarea className="field" value={value} onChange={(e) => onChange(e.target.value)} />;
   const type = field === "email" ? "email" : field === "phone" ? "tel" : "text";
   const mode = field === "budget" ? "decimal" : undefined;
-  const hint = field === "propertyType" ? PROPERTY_TYPES.join(", ") : undefined;
-  return <input className="field" type={type} inputMode={mode} value={value} title={hint} onChange={(e) => onChange(e.target.value)} />;
+  return <input className="field" type={type} inputMode={mode} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 type MapAnswer = { kind: "ok"; point: Point } | { kind: "no"; message: string };
@@ -434,10 +455,10 @@ async function findOnMap(place: string): Promise<MapAnswer> {
 }
 
 // The current question, asked one at a time.
-function Question({ number, total, field, text, onAnswer, onSkip }: {
-  number: number; total: number; field: string; text: string; onAnswer: (e: Edit) => void; onSkip: () => void;
+function Question({ number, total, field, text, initial = "", onAnswer, onSkip }: {
+  number: number; total: number; field: string; text: string; initial?: string; onAnswer: (e: Edit) => void; onSkip: () => void;
 }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initial);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const choices = field === "contactType" ? CONTACT_TYPES : field === "source" ? SOURCES : null;
@@ -470,7 +491,9 @@ function Question({ number, total, field, text, onAnswer, onSkip }: {
       ) : (
         <>
           <label className="sr-only" htmlFor={`q-${number}`}>Answer</label>
-          {field === "followUp" ? (
+          {field === "propertyType" ? (
+            <PropertyTypePicker value={value} onChange={setValue} />
+          ) : field === "followUp" ? (
             <input id={`q-${number}`} className="field" type="date" value={value} onChange={(e) => setValue(e.target.value)} />
           ) : (
             <input id={`q-${number}`} className="field" type="text" value={value} onChange={(e) => setValue(e.target.value)}
