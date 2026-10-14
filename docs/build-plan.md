@@ -186,3 +186,23 @@ First real runs on the test boards (Oct 14): Claude took 2.8 to 7.0 seconds per 
 
 - **Weekday names:** Claude may turn "Tuesday" into the next such date. The approval screen shows dates with the weekday ("Tue, Oct 20, 2026") so a misread is easy to spot.
 - **Map lookup:** Google Maps Geocoding turns Desired Location into a map point when the proposal is built. The approval screen shows the address Google found. If nothing is found, the field is left out and the broker is asked. The key is read from `GOOGLE_MAPS_API_KEY`; restrict it to the Geocoding API.
+- **Named sites:** "wants to be at the old Bergen Mill site" goes in Notes; Desired Location is not changed. In Phase 3, named sites are looked up on the property boards and the broker is offered a property link.
+
+## Claude Design
+
+Canvas: https://claude.ai/artifact/AN33vsn4sYWVs8vRs1JSbn (first round, Oct 14, 2026). Phone: home, ask (lookup), capture review, question inside the proposal, pick a match, saved. Desktop: home, summary, review with current and proposed columns, business-card photo.
+
+Look: Manrope; navy #1D3F7E for text and links, orange #D2461A for the main action, light grey #F4F5F8 ground, Vantage Commercial logo in the header.
+
+Still to design (round 2), from what the capture code produces:
+
+1. Blocked: "This record belongs to Emily Stein", with no changes, and the unassigned record with a Claim button.
+2. Save failed, with the proposal kept and a Retry button.
+3. Notes shown as current text plus the added text, so brokers see nothing is lost.
+4. Desired Location with the map address found, and the "is this the right place?" question for a partial match.
+5. Dates with the weekday ("Fri, Oct 16, 2026"), including the date chips.
+6. A line for automations the save will start (follow-up date, Qualified moving a Lead to Contacts).
+7. Several questions: "Question 1 of 3".
+8. Several people in one note: one card each.
+9. "Saved today" list.
+10. Approval settings admin page (desktop only, Operations Manager).
