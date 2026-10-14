@@ -53,6 +53,6 @@ describe("Monday OAuth 2.1", () => {
 
   it("reports Monday's error instead of signing in", async () => {
     const { fetchImpl } = capture({ error: "invalid_grant" }, 400);
-    await expect(refreshTokens("used", fetchImpl)).rejects.toThrow("invalid_grant");
+    await expect(refreshTokens("used", fetchImpl)).rejects.toThrow("HTTP 400: invalid_grant");
   });
 });

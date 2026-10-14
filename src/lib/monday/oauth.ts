@@ -51,8 +51,19 @@ async function tokenRequest(params: Record<string, string>, fetchImpl: typeof fe
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({ ...params, client_id: clientId, client_secret: clientSecret }),
   });
-  const body = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string };
-  if (!res.ok || !body.access_token) throw new Error(`Monday sign-in failed (${body.error ?? `HTTP ${res.status}`}).`);
+  const text = await res.text();
+  let body: { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string } = {};
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Not JSON: report the start of what came back.
+  }
+  if (!res.ok || !body.access_token) {
+    // Never echo a reply that carries a token.
+    const raw = /token/i.test(text) ? "unexpected reply" : text.slice(0, 120) || "no body";
+    const why = body.error ? [body.error, body.error_description].filter(Boolean).join(" - ") : raw;
+    throw new Error(`Monday sign-in failed (HTTP ${res.status}: ${why}).`);
+  }
   return {
     accessToken: body.access_token,
     refreshToken: body.refresh_token,
