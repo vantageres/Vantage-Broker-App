@@ -2,8 +2,10 @@
 // boards and print the proposals. Reads only; nothing is saved to Monday.
 //
 //   npm run try-capture -- "Met Dave Reyes at Garrison Foods..."
+//   npm run try-capture -- --model claude-sonnet-5-5 "note text"
 //   npm run try-capture -- --extraction path/to/extraction.json "note text"
 //
+// --model picks Opus 5.5 (default), Sonnet 5.5, or Haiku 5.5.
 // --extraction skips the Claude call and uses a saved extraction instead.
 
 import { readFileSync } from "node:fs";
@@ -11,18 +13,24 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mondayClient } from "../src/lib/monday/client";
 import { TEST_BOARDS } from "../src/lib/monday/boards";
 import { loadPersonRecords } from "../src/lib/monday/records";
-import { extractPeople, Extraction } from "../src/lib/capture/extract";
+import { CAPTURE_MODELS, extractPeople, Extraction, type CaptureModel } from "../src/lib/capture/extract";
 import { buildProposal, type Proposal } from "../src/lib/capture/proposal";
 
 const args = process.argv.slice(2);
 let extractionFile: string | undefined;
-if (args[0] === "--extraction") {
-  extractionFile = args[1];
-  args.splice(0, 2);
+let model: CaptureModel = "claude-opus-5-5";
+while (args[0]?.startsWith("--")) {
+  const [flag, value] = args.splice(0, 2);
+  if (flag === "--extraction") extractionFile = value;
+  else if (flag === "--model" && (CAPTURE_MODELS as readonly string[]).includes(value)) model = value as CaptureModel;
+  else {
+    console.error(`Unknown option ${flag} ${value ?? ""}`);
+    process.exit(1);
+  }
 }
 const note = args.join(" ").trim();
 if (!note) {
-  console.error('Usage: npm run try-capture -- [--extraction file.json] "note text"');
+  console.error('Usage: npm run try-capture -- [--model id] [--extraction file.json] "note text"');
   process.exit(1);
 }
 
@@ -41,7 +49,7 @@ const [{ me, account }, extraction] = await Promise.all([
   monday.query<{ me: { id: string; name: string }; account: { slug: string } }>("{ me { id name } account { slug } }"),
   extractionFile
     ? Promise.resolve(Extraction.parse(JSON.parse(readFileSync(extractionFile, "utf8"))))
-    : extractPeople(claude(), note, today),
+    : extractPeople(claude(), note, today, model),
 ]);
 const extractedAt = Date.now();
 const records = (
@@ -69,12 +77,16 @@ function print(p: Proposal) {
     for (const c of p.changes) console.log(`  ${c.label}: ${c.current ? `"${c.current}" -> ` : ""}"${c.proposed}"`);
   }
   for (const n of p.placedInNotes) console.log(`Placed in Notes: "${n.text}" (${n.why})`);
-  for (const q of p.questions) console.log(`Question: ${q.question}`);
+  // The app asks one question at a time.
+  if (p.questions.length) {
+    const more = p.questions.length - 1;
+    console.log(`Question: ${p.questions[0].question}${more ? `  (${more} more after this)` : ""}`);
+  }
   for (const a of p.automations) console.log(`Automation: ${a}`);
   if (!p.blocked && t.kind !== "pick") console.log(`Broker Note to save: "${p.noteText}"`);
 }
 
 proposals.forEach(print);
 console.log(
-  `\nTiming: ${extractionFile ? "saved extraction" : "Claude"} ${extractedAt - started} ms, Monday load ${loadedAt - extractedAt} ms (${records.length} records)`,
+  `\nTiming: ${extractionFile ? "saved extraction" : model} ${extractedAt - started} ms, Monday load ${loadedAt - extractedAt} ms (${records.length} records)`,
 );

@@ -3,6 +3,11 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { CONTACT_TYPES, PROPERTY_TYPES, SOURCES } from "../monday/boards";
 
+export const UNCERTAIN_FIELDS = [
+  "name", "business_name", "phones", "emails", "contact_type", "property_types", "size",
+  "budget", "desired_location", "follow_up_date", "source", "other",
+] as const;
+
 // What Claude reads out of a broker's note. Claude only extracts; matching,
 // permissions, and fit rules are applied in code afterwards.
 export const ExtractedPerson = z.object({
@@ -29,8 +34,10 @@ export const ExtractedPerson = z.object({
   requirement_notes: z.string().nullable()
     .describe("One short line with requirement details that have no field: rent per sf, budget ranges, lease end dates, extra areas, timing"),
   properties_mentioned: z.array(z.string()),
-  uncertain: z.array(z.object({ field: z.string(), reason: z.string() }))
-    .describe("Anything you could not read with confidence. Never guess a value; list it here instead"),
+  uncertain: z.array(z.object({
+    field: z.enum(UNCERTAIN_FIELDS),
+    question: z.string().describe("One short question to ask the broker, ending in a question mark"),
+  })).describe("Anything you could not read with confidence. Never guess a value; ask about it here instead"),
 });
 
 export const Extraction = z.object({
@@ -50,14 +57,27 @@ Rules:
 - Highway numbers in New Jersey are usually interstates or routes: "295" means I-295, "73" means Route 73.
 - Write sizes out in full: "15 to 20k sf" becomes "15,000 to 20,000 sf".
 - follow_up_date is only for a specific day. "March", "next quarter", or "in a few weeks" leave it null and keep the words in follow_up_phrase.
-- If something is unclear (a garbled number, a name that could be two people), add it to uncertain rather than choosing.`;
+- If something is unclear (a garbled number, an ambiguous day, lease versus buy), leave that field empty and add one question to uncertain rather than choosing. Do not add a question just because only a first name was given; the app handles matching.`;
 
-export async function extractPeople(client: Anthropic, note: string, today: string): Promise<Extraction> {
+// Opus 5.5 is the default. Sonnet 5.5 and Haiku 5.5 are being compared for
+// speed and accuracy (see docs/build-plan.md).
+export const CAPTURE_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] as const;
+export type CaptureModel = (typeof CAPTURE_MODELS)[number];
+
+export async function extractPeople(
+  client: Anthropic,
+  note: string,
+  today: string,
+  model: CaptureModel = "claude-opus-5-5",
+): Promise<Extraction> {
+  // Haiku has no server-side fallback; a declined note is simply reported.
+  const fallback = model === "claude-haiku-5-5"
+    ? {}
+    : { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
   const response = await client.beta.messages.parse({
-    model: "claude-opus-5-5",
+    model,
     max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    ...fallback,
     output_config: { effort: "medium", format: betaZodOutputFormat(Extraction) },
     system: SYSTEM,
     messages: [{ role: "user", content: `Today is ${today}.\n\nBroker's note:\n${note}` }],

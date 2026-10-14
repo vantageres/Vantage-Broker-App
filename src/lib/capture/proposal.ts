@@ -1,6 +1,20 @@
 import { normalizePhone, splitEmails, type PersonRecord, type RequirementField } from "../monday/records";
 import { findMatches, type MatchCandidate, type MatchResult } from "../matching";
-import type { ExtractedPerson } from "./extract";
+import type { ExtractedPerson, UNCERTAIN_FIELDS } from "./extract";
+
+// Which record field each of Claude's uncertain fields would have filled.
+const UNCERTAIN_TO_FIELD: Partial<Record<(typeof UNCERTAIN_FIELDS)[number], RequirementField>> = {
+  business_name: "businessName",
+  phones: "phone",
+  emails: "email",
+  contact_type: "contactType",
+  property_types: "propertyType",
+  size: "size",
+  budget: "budget",
+  desired_location: "desiredLocation",
+  follow_up_date: "followUp",
+  source: "source",
+};
 
 // A proposal is everything the approval screen shows for one person.
 // Nothing in it has been saved.
@@ -38,6 +52,7 @@ export interface Proposal {
   changes: FieldChange[];
   noteText: string;
   placedInNotes: { text: string; why: string }[];
+  // Asked one at a time, in this order. The approval screen shows the first.
   questions: { field: string; question: string }[];
   automations: string[];
 }
@@ -96,9 +111,13 @@ function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNot
   const notes: string[] = [];
   if (p.requirement_notes) {
     notes.push(p.requirement_notes);
+    // Name the Budget rule only when a dollar figure was moved to Notes.
+    const moneyMoved = /\$|\bper (sq|square)|\/\s*(sf|ft)\b/i.test(p.requirement_notes);
     placedInNotes.push({
       text: p.requirement_notes,
-      why: "These details have no field of their own. Budget holds a single dollar amount only.",
+      why: moneyMoved
+        ? "Budget holds a single dollar amount, so rent per foot and price ranges go in Notes."
+        : "No field holds these details, so they go in Notes.",
     });
   }
   const extras = p.extra_locations.filter((l) => !p.requirement_notes?.includes(l));
@@ -111,21 +130,32 @@ function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNot
   }
   if (notes.length) values.notes = notes.join(". ");
   if (p.follow_up_date && /^\d{4}-\d{2}-\d{2}$/.test(p.follow_up_date)) values.followUp = p.follow_up_date;
+
+  // Never fill a field Claude was unsure about. Its question is asked instead.
+  for (const u of p.uncertain) {
+    const field = UNCERTAIN_TO_FIELD[u.field];
+    if (field) delete values[field];
+  }
   return values;
 }
 
 function questionsFor(p: ExtractedPerson, today: string): Proposal["questions"] {
   const questions: Proposal["questions"] = [];
-  if (p.follow_up_phrase && !p.follow_up_date) {
+  const unsureOfDate = p.uncertain.find((u) => u.field === "follow_up_date");
+  if (unsureOfDate) {
+    questions.push({ field: "followUp", question: unsureOfDate.question });
+  } else if (p.follow_up_phrase && !p.follow_up_date) {
     questions.push({
       field: "followUp",
       question: `You said to follow up "${p.follow_up_phrase}". What date should I set?`,
     });
-  }
-  if (p.follow_up_date && p.follow_up_date < today) {
+  } else if (p.follow_up_date && p.follow_up_date < today) {
     questions.push({ field: "followUp", question: `The follow-up date ${p.follow_up_date} is in the past. What date should I set?` });
   }
-  for (const u of p.uncertain) questions.push({ field: u.field, question: u.reason });
+  for (const u of p.uncertain) {
+    if (u.field === "follow_up_date" || u.field === "name") continue;
+    questions.push({ field: UNCERTAIN_TO_FIELD[u.field] ?? u.field, question: u.question });
+  }
   return questions;
 }
 
@@ -208,7 +238,7 @@ export function buildProposal(
   if (!isOwner(record, me)) {
     const blocked: Blocked =
       record.contactBrokerIds.length === 0 ? { reason: "unassigned" } : { reason: "not-owner", owner: record.contactBrokerNames };
-    return { ...base, target, blocked, changes: [], questions: [] };
+    return { ...base, target, blocked, changes: [], placedInNotes: [], questions: [] };
   }
 
   const automations: string[] = [];

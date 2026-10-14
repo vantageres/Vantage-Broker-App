@@ -166,3 +166,17 @@ Speed tests on the full item counts run read-only against the live Leads and Con
 
 1. **Geocoding.** Desired Location is a map column, so saving "I-295, NJ" needs a latitude and longitude. That needs a geocoding service (for example Google Maps or Mapbox). This is a map lookup, not a data source, but it is an outside service and needs a decision.
 2. **Follow-up automation on test boards.** Add the six-month Follow Up Date automation to Contacts Test so the approval screen's automation warning can be tested.
+
+## Claude model for capture
+
+**Decision (Oct 14, 2026):** start with Claude Opus 5.5 at medium effort, with server-side fallback on.
+
+First real runs on the test boards (Oct 14): Claude took 2.8 to 5.6 seconds per note, and each extraction was correct for the Dave Reyes example, the two Daves, and Ray Fulton.
+
+**To do: compare Sonnet 5.5 and Haiku 5.5 for speed and accuracy.**
+
+- Use a fixed set of about 20 real-style notes covering every test scenario, plus messy ones (dictation errors, several people in one note, vague dates).
+- Run each note on Opus 5.5, Sonnet 5.5, and Haiku 5.5 with `npm run try-capture -- --model <id> "note"`. Haiku has no server-side fallback.
+- Score each extraction field by field against the expected answer, and record time and cost per note.
+- Pick the cheapest, fastest model whose accuracy matches Opus on the scenarios that matter most: never guessing a date, phone number, or email, and placing values that don't fit into Notes.
+- Repeat with pilot notes once brokers are using the app.

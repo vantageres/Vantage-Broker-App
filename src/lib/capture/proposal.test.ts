@@ -115,6 +115,46 @@ describe("buildProposal", () => {
     expect(p.placedInNotes.length).toBeGreaterThan(0);
   });
 
+  it("explains Notes without mentioning Budget when no money was moved", () => {
+    const p = buildProposal(person({ name: "Sam", requirement_notes: "Looking to buy, wants frontage on Route 70" }), [], ME, "note", TODAY);
+    expect(p.placedInNotes[0].why).not.toContain("Budget");
+  });
+
+  it("shows nothing placed in Notes on a blocked proposal", () => {
+    const theirs = record({ name: "Ray Fulton", contactBrokerIds: ["2"], contactBrokerNames: "Emily Stein" });
+    const p = buildProposal(person({ name: "Ray Fulton", requirement_notes: "Budget 1.2M to buy" }), [theirs], ME, "note", TODAY);
+    expect(p.placedInNotes).toEqual([]);
+  });
+
+  it("leaves a field empty and asks when Claude is unsure of it", () => {
+    const p = buildProposal(
+      person({
+        name: "Dave Reyes",
+        follow_up_phrase: "call him Tuesday",
+        follow_up_date: "2026-10-20",
+        uncertain: [{ field: "follow_up_date", question: "Did you mean Tuesday, October 20?" }],
+      }),
+      [], ME, "note", TODAY,
+    );
+    expect(p.changes.find((c) => c.field === "followUp")).toBeUndefined();
+    expect(p.questions).toEqual([{ field: "followUp", question: "Did you mean Tuesday, October 20?" }]);
+  });
+
+  it("puts the match question first and skips first-name-only uncertainty", () => {
+    const p = buildProposal(
+      person({
+        name: "Dave",
+        follow_up_phrase: "in March",
+        uncertain: [
+          { field: "name", question: "Which Dave?" },
+          { field: "contact_type", question: "Is he looking to lease or buy?" },
+        ],
+      }),
+      [record({ name: "Dave Reyes" }), record({ name: "Dave Morales" })], ME, "note", TODAY,
+    );
+    expect(p.questions.map((q) => q.field)).toEqual(["match", "followUp", "contactType"]);
+  });
+
   it("recognises a second email address held in one field", () => {
     const existing = record({ name: "Kevin O'Brien", emails: ["kobrien@obrienhale.example", "kevin.obrien@mail.example"] });
     const p = buildProposal(person({ name: "Kevin", emails: ["kevin.obrien@mail.example"] }), [existing], ME, "note", TODAY);
