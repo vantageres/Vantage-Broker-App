@@ -16,12 +16,20 @@ describe("isQuestion", () => {
     "Is Linda still looking?",
     "Summarize open industrial requirements under 20k sf.",
     "List retail space in Haddonfield",
+    "available industrial: 15,000 to 20,000 sf",
+    "Available industrial 15 to 20k sf",
+    "Retail in Haddonfield around 2,000 sf",
+    "Land for sale in Marlton",
+    "2,000 sf retail",
   ])("asks: %s", (t) => expect(isQuestion(t)).toBe(true));
 
   it.each([
     "Met Linda Park, needs 20 parking spaces, follow up Oct 28.",
     "Did a tour with Linda Park today. She wants 5,000 sf near 295.",
     "Had coffee with Ray Fulton",
+    "Retail tenant Linda Park called, wants 2,000 sf in Haddonfield",
+    "Office space tour with Dave Reyes went well, he needs 5,000 sf",
+    "Industrial buyer Sam Whitaker met at the 7 Industrial Ave showing, looking at 30k sf, follow up Friday",
     "Talked to Dave, he asked whether the landlord would cover fit-out, and whether the space has a loading dock and three-phase power?",
     "",
   ])("notes: %s", (t) => expect(isQuestion(t)).toBe(false));

@@ -7,10 +7,18 @@ const ASKING = /^(what|what's|whats|who|who's|whos|where|which|any|anything|tell
 // Openings that also start ordinary notes ("Did a tour with…"): a question only with a question mark.
 const MAYBE = /^(is|are|do|does|did|has|have|had|can|when|how|was|were|should)\b/i;
 
+// A short search typed without a question mark ("Available industrial 15 to
+// 20k sf", "Retail in Haddonfield"): starts with what is wanted, and says
+// nothing that happened, so it isn't a note.
+const SEARCH_START = /^(available|vacant|open|industrial|warehouse|flex|retail|office|land|medical|healthcare|multifamily|properties|property|listings?|space|suites?|\d[\d,.]*\s*k?\s*(sf|sq|square|acres?)?\b)/i;
+const SEARCH_WORDS = /\b(sf|sq\.?\s?ft|square f(ee|oo)t|acres?|space|suites?|listings?|propert(y|ies)|for (lease|sale)|available|vacant|industrial|warehouse|flex|retail|office|land)\b/i;
+const HAPPENED = /\b(met|meet|meeting|talked|spoke|called|call|emailed|texted|toured|tour|visited|said|says|told|wants|needs|left|follow ?up|lunch|coffee)\b/i;
+
 export function isQuestion(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
   if (ASKING.test(t)) return true;
+  if (SEARCH_START.test(t) && SEARCH_WORDS.test(t) && !HAPPENED.test(t) && t.split(/\s+/).length <= 12) return true;
   const asked = t.endsWith("?");
   if (asked && MAYBE.test(t)) return true;
   // A short line ending in "?" ("Linda Park?") is a question; a long note that
