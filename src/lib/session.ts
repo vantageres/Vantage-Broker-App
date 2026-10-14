@@ -1,7 +1,9 @@
-import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
+import { getIronSession, sealData, unsealData, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 import { mondayClient, type MondayClient } from "./monday/client";
 import { refreshTokens, type Tokens } from "./monday/oauth";
+import { renewShared } from "./renewal";
+import { getStore } from "./store";
 
 // The broker's sign-in lives in an encrypted, http-only cookie so it persists
 // on the phone. It holds the broker's own Monday tokens: every Monday call is
@@ -64,23 +66,22 @@ export function applyTokens(session: BrokerSession, tokens: Tokens) {
   session.expiresAt = tokens.expiresAt;
 }
 
-// One renewal at a time per sign-in: a refresh token works only once, so two
-// requests renewing together would sign the broker out.
-const renewing = new Map<string, Promise<Tokens>>();
-
+// One renewal at a time per sign-in, across every server copy (see renewal.ts).
 async function renew(session: IronSession<BrokerSession>): Promise<boolean> {
-  if (!session.refreshToken || !session.sid) return false;
-  const key = session.sid;
-  let pending = renewing.get(key);
-  if (!pending) {
-    pending = refreshTokens(session.refreshToken).finally(() => setTimeout(() => renewing.delete(key), 30_000));
-    renewing.set(key, pending);
-  }
+  if (!session.refreshToken) return false;
+  const password = sessionOptions().password as string;
   try {
-    applyTokens(session, await pending);
+    const tokens = await renewShared(session.refreshToken, {
+      store: getStore(),
+      refresh: refreshTokens,
+      seal: (t) => sealData(t, { password, ttl: 300 }),
+      unseal: (s) => unsealData<Tokens>(s, { password, ttl: 300 }),
+    });
+    applyTokens(session, tokens);
     await session.save();
     return true;
-  } catch {
+  } catch (error) {
+    console.error(`[sign-in] renewal failed: ${error instanceof Error ? error.message : "unknown"}`);
     return false;
   }
 }

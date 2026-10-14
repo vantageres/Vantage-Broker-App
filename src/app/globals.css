@@ -184,3 +184,23 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .signin p { margin: 0; color: var(--muted); max-width: 320px; line-height: 1.5; }
 .signin .approve { width: 100%; max-width: 320px; text-decoration: none; display: flex; align-items: center; justify-content: center; }
 .signin .secondary { width: 100%; max-width: 320px; }
+
+/* Approval settings (desktop first) */
+.admin { flex: 1; width: 100%; max-width: 880px; margin: 0 auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+.admin-intro { display: flex; flex-direction: column; gap: 6px; }
+.admin-intro p { margin: 0; font-size: 16px; line-height: 1.5; color: #2b3650; max-width: 640px; }
+.admin-phase { margin: 0; background: var(--navy-tint); color: var(--navy-dark); border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.45; font-weight: 600; }
+.admin-list { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.admin-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 18px 20px; border-bottom: 1px solid var(--line-soft); }
+.admin-row:last-child { border-bottom: 0; }
+@media (max-width: 520px) { .segmented { flex-basis: 100%; } .segmented button { font-size: 13px; } }
+.admin-text { flex: 999 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.admin-text .name { font-size: 16px; font-weight: 700; }
+.admin-text .detail { font-size: 14px; color: var(--muted); line-height: 1.45; }
+.segmented { flex: 0 1 340px; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: var(--ground); border-radius: 14px; padding: 4px; }
+.segmented button { min-width: 0; height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: transparent; color: var(--disabled-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.segmented button[aria-pressed="true"] { background: #fff; color: var(--navy); font-weight: 800; box-shadow: 0 1px 3px rgba(24, 35, 58, 0.12); }
+.segmented button:disabled { cursor: progress; }
+.segmented[aria-busy="true"] { opacity: 0.7; }
+.admin-foot { margin: 0; font-size: 13px; color: var(--muted); }
+@media (min-width: 900px) { .admin { padding: 40px 24px; } }

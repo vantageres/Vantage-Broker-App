@@ -4,6 +4,8 @@ import { savedToday } from "@/lib/monday/saved-today";
 import { startOfTodayInNewJersey, timeInNewJersey } from "@/lib/time";
 import { BackBar } from "@/components/TopBar";
 import { Out } from "@/components/icons";
+import { isOperationsManager } from "@/lib/approvals";
+import Link from "next/link";
 
 export default async function SavedToday() {
   const signedIn = await pageBroker("/saved");
@@ -44,6 +46,11 @@ export default async function SavedToday() {
               ))}
             </div>
           </>
+        )}
+        {isOperationsManager(session.userId) && (
+          <p style={{ marginTop: 24, textAlign: "center" }}>
+            <Link className="open" href="/admin/approvals">Approval settings</Link>
+          </p>
         )}
         <form method="post" action="/api/auth/logout" style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
           <button className="secondary" type="submit" style={{ padding: "0 18px" }}>Sign out</button>

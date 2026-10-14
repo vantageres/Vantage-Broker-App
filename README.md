@@ -18,6 +18,8 @@ Settings, in `.env.local` for development or the host's settings in production:
 | `APP_URL` | The app's address, e.g. `https://broker.vantageres.com`. The Monday app's redirect URL is `APP_URL/api/auth/callback`. |
 | `BROKER_APP_ANTHROPIC_KEY` | Vantage's Claude API key. |
 | `GOOGLE_MAPS_API_KEY` | Google Maps Geocoding key, for Desired Location. |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Upstash Redis (added by Vercel's Upstash integration). Holds approval settings and the short sign-in renewal lock; never Monday records. Required in production; development uses an in-memory stand-in. |
+| `OPERATIONS_MANAGER_IDS` | Monday user ids, comma-separated, allowed to change approval settings at `/admin/approvals`. |
 
 Development only (ignored in production):
 
@@ -29,7 +31,7 @@ Development only (ignored in production):
 ## Checks
 
 ```
-npm test          # rules, matching, saving, memory
+npm test          # rules, matching, saving, memory, approvals, sign-in renewal
 npm run typecheck
 npx next build
 npm run try-capture -- "a note"   # a note against the test boards, read only
