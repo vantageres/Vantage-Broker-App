@@ -164,7 +164,7 @@ Speed tests on the full item counts run read-only against the live Leads and Con
 
 ## New questions from the spike
 
-1. **Geocoding.** Desired Location is a map column, so saving "I-295, NJ" needs a latitude and longitude. That needs a geocoding service (for example Google Maps or Mapbox). This is a map lookup, not a data source, but it is an outside service and needs a decision.
+1. **Geocoding.** Decided: Google Maps (see below).
 2. **Follow-up automation on test boards.** Add the six-month Follow Up Date automation to Contacts Test so the approval screen's automation warning can be tested.
 
 ## Claude model for capture
@@ -182,6 +182,7 @@ First real runs on the test boards (Oct 14): Claude took 2.8 to 7.0 seconds per 
 - Pick the cheapest, fastest model whose accuracy matches Opus on the scenarios that matter most: never guessing a date, phone number, or email, and placing values that don't fit into Notes.
 - Repeat with pilot notes once brokers are using the app.
 
-## Open: weekday names
+## Decided Oct 14, 2026
 
-Claude turns a bare weekday ("call him Tuesday") into the next such date without asking. Proposed: keep that, and show the weekday with the date on the approval screen ("Tue, Oct 20") so a misread is easy to spot. Alternative: always ask. Waiting on John.
+- **Weekday names:** Claude may turn "Tuesday" into the next such date. The approval screen shows dates with the weekday ("Tue, Oct 20, 2026") so a misread is easy to spot.
+- **Map lookup:** Google Maps Geocoding turns Desired Location into a map point when the proposal is built. The approval screen shows the address Google found. If nothing is found, the field is left out and the broker is asked. The key is read from `GOOGLE_MAPS_API_KEY`; restrict it to the Geocoding API.

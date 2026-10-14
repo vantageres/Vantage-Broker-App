@@ -15,6 +15,7 @@ import { TEST_BOARDS } from "../src/lib/monday/boards";
 import { loadPersonRecords } from "../src/lib/monday/records";
 import { CAPTURE_MODELS, extractPeople, Extraction, type CaptureModel } from "../src/lib/capture/extract";
 import { buildProposal, type Proposal } from "../src/lib/capture/proposal";
+import { googleGeocoder, resolveLocations } from "../src/lib/geocode";
 
 const args = process.argv.slice(2);
 let extractionFile: string | undefined;
@@ -57,7 +58,17 @@ const records = (
 ).flat();
 const loadedAt = Date.now();
 
-const proposals = extraction.people.map((p) => buildProposal(p, records, { id: String(me.id), name: me.name }, note, today));
+let proposals = extraction.people.map((p) => buildProposal(p, records, { id: String(me.id), name: me.name }, note, today));
+
+// Map lookup for Desired Location, when a Google Maps key is available.
+const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
+if (mapsKey) {
+  const geocode = googleGeocoder(mapsKey);
+  proposals = await Promise.all(proposals.map((p) => resolveLocations(p, geocode)));
+} else {
+  console.log("(No GOOGLE_MAPS_API_KEY, so Desired Location is not looked up on the map.)");
+}
+const mappedAt = Date.now();
 
 function print(p: Proposal) {
   console.log(`\n=== ${p.subject} ===`);
@@ -74,7 +85,11 @@ function print(p: Proposal) {
   if (p.blocked?.reason === "unassigned") console.log("Blocked: no Contact Broker. Offer to claim it first.");
   if (p.changes.length) {
     console.log("Changes:");
-    for (const c of p.changes) console.log(`  ${c.label}: ${c.current ? `"${c.current}" -> ` : ""}"${c.proposed}"`);
+    for (const c of p.changes) {
+      const now = c.currentDisplay ?? c.current;
+      const next = c.location ? `${c.proposed}" (map: ${c.location.address})` : `${c.proposedDisplay ?? c.proposed}"`;
+      console.log(`  ${c.label}: ${now ? `"${now}" -> ` : ""}"${next}`);
+    }
   }
   for (const n of p.placedInNotes) console.log(`Placed in Notes: "${n.text}" (${n.why})`);
   // The app asks one question at a time.
@@ -88,5 +103,5 @@ function print(p: Proposal) {
 
 proposals.forEach(print);
 console.log(
-  `\nTiming: ${extractionFile ? "saved extraction" : model} ${extractedAt - started} ms, Monday load ${loadedAt - extractedAt} ms (${records.length} records)`,
+  `\nTiming: ${extractionFile ? "saved extraction" : model} ${extractedAt - started} ms, Monday load ${loadedAt - extractedAt} ms (${records.length} records)${mapsKey ? `, map lookup ${mappedAt - loadedAt} ms` : ""}`,
 );

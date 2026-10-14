@@ -24,6 +24,21 @@ export interface FieldChange {
   label: string;
   current: string;
   proposed: string;
+  // What the approval screen shows when it differs from the saved value,
+  // e.g. "Tue, Oct 20, 2026" for 2026-10-20.
+  currentDisplay?: string;
+  proposedDisplay?: string;
+  // Desired Location only: the map point found for the proposed place.
+  location?: { lat: number; lng: number; address: string };
+}
+
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", {
+  weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+});
+
+// Dates are shown with their weekday so a misread "Tuesday" is easy to spot.
+export function formatDate(iso: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? WEEKDAY_FORMAT.format(new Date(`${iso}T00:00:00Z`)) : iso;
 }
 
 export interface RecordRef {
@@ -174,7 +189,12 @@ function diff(values: Partial<Record<RequirementField, string>>, current?: Perso
       continue;
     }
     if (now.trim().toLowerCase() === proposed.trim().toLowerCase()) continue;
-    changes.push({ field, label: LABELS[field], current: now, proposed });
+    const change: FieldChange = { field, label: LABELS[field], current: now, proposed };
+    if (field === "followUp") {
+      change.proposedDisplay = formatDate(proposed);
+      if (now) change.currentDisplay = formatDate(now);
+    }
+    changes.push(change);
   }
   return changes;
 }

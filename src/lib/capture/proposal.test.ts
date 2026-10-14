@@ -155,6 +155,14 @@ describe("buildProposal", () => {
     expect(p.questions.map((q) => q.field)).toEqual(["match", "followUp", "contactType"]);
   });
 
+  it("shows the follow-up date with its weekday", () => {
+    const p = buildProposal(person({ name: "Linda Park", follow_up_date: "2026-10-20" }), [], ME, "note", TODAY);
+    expect(p.changes.find((c) => c.field === "followUp")).toMatchObject({
+      proposed: "2026-10-20",
+      proposedDisplay: "Tue, Oct 20, 2026",
+    });
+  });
+
   it("recognises a second email address held in one field", () => {
     const existing = record({ name: "Kevin O'Brien", emails: ["kobrien@obrienhale.example", "kevin.obrien@mail.example"] });
     const p = buildProposal(person({ name: "Kevin", emails: ["kevin.obrien@mail.example"] }), [existing], ME, "note", TODAY);
