@@ -15,7 +15,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
   - lookups ("What do we have on Maria Chen?")
 - Monday app scopes: `me:read`, `boards:read`, `boards:write`, and now `updates:read`.
   - `updates:read` was added after a lookup showed an error in the notes section.
-  - John must sign out and back in to pick it up. Then check that the notes section shows without the red error line.
+  - Confirmed Oct 14: after signing in again, notes show with no error line.
 
 ## Seeing the live app from a session
 
@@ -39,7 +39,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 
 ## Next work, in order
 
-1. **Confirm notes in lookups** after John signs in again with `updates:read`.
+1. **Notes in lookups:** confirmed Oct 14. After signing in again with `updates:read`, John sees the notes section with no error line.
 2. **Service worker** for the installed app. Built Oct 14 (`public/sw.js`, offline page `public/offline.html`). Tried locally with `next build && next start`: it registers, caches only the shell files, and shows the offline page when the server is down. John to check on a phone: install, turn on airplane mode, open the app.
 3. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
 4. **John's decisions and setup:**
