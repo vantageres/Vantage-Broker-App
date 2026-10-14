@@ -38,6 +38,12 @@ export function Conversation({ firstName }: { firstName: string }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  // On a phone, the keyboard's microphone is how to talk instead of type.
+  const [onPhone, setOnPhone] = useState(false);
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setOnPhone(/iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1));
+  }, []);
   const end = useRef<HTMLDivElement>(null);
 
   // Block body on purpose: newer Chrome returns a promise from scrollIntoView,
@@ -157,7 +163,9 @@ export function Conversation({ firstName }: { firstName: string }) {
     <>
       <main className="thread" aria-live="polite">
         {entries.length === 0 && (
-          <p className="empty">Hi {firstName}. Type what happened, and I&apos;ll propose the changes for Monday. Nothing is saved until you approve. You can also ask what Monday has on someone, search properties, or ask who is looking for what.</p>
+          <p className="empty">Hi {firstName}. Type what happened, and I&apos;ll propose the changes for Monday. Nothing is saved until you approve. You can also ask what Monday has on someone, search properties, or ask who is looking for what.
+            {onPhone && <span className="tip">Tip: tap the microphone on your keyboard to talk instead of typing.</span>}
+          </p>
         )}
         {entries.map((entry) => {
           switch (entry.kind) {

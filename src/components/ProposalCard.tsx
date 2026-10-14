@@ -24,6 +24,20 @@ const LABELS: Record<string, string> = {
   phone: "Phone", email: "Email",
 };
 
+// Dictation often mishears digits, spellings and amounts, so these proposed
+// values carry a reminder to check them before approving.
+const CHECK: Record<string, string> = {
+  phone: "Check every digit",
+  email: "Check the spelling",
+  budget: "Check the amount",
+};
+
+// "650000" as "$650,000", so an amount is easy to check. What's saved is unchanged.
+function showMoney(value: string) {
+  const n = Number(value.replace(/[$,\s]/g, ""));
+  return Number.isFinite(n) && value.trim() ? `$${n.toLocaleString("en-US")}` : value;
+}
+
 const DATE_FMT = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 function showDate(iso: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? DATE_FMT.format(new Date(`${iso}T00:00:00Z`)) : iso;
@@ -277,10 +291,11 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
                     <span className="stack">
                       <span>
                         {c?.current && <span className="was">{c.currentDisplay ?? c.current}</span>}
-                        <strong>{field === "followUp" ? showDate(v.value) : v.value}</strong>
+                        <strong>{field === "followUp" ? showDate(v.value) : field === "budget" ? showMoney(v.value) : v.value}</strong>
                       </span>
                       {field === "desiredLocation" && v.location && <span className="sub">On the map: {v.location.address}</span>}
                       {field === "desiredLocation" && !v.location && <span className="warn">Not found on the map yet</span>}
+                      {CHECK[field] && <span className="check">{CHECK[field]}</span>}
                     </span>
                     <span className="pencil"><Pencil /></span>
                   </span>

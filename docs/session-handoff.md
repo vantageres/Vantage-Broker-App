@@ -50,9 +50,11 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 6. **Property Leads lookup and edit** (built Oct 14; see `build-plan.md`). Tried in the local app against Property Leads Test: lookup, sensitive fields hidden on Emily's 510 Main St, refusals (not assigned, changed meanwhile, Monday-only status), and a real save.
    - **Keep 22 Elm St as it is** (John, Oct 14). The LA Signed test set off Monday's marketing automations: Status In Marketing, LA Signed and In Marketing Date Oct 14, Pre-Listing group, 11 checklist subitems. Don't restore it unless he asks.
    - LA Signed stays settable, with the short warning "This moves the listing into marketing."
-7. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
-8. **John's decisions and setup:**
+7. **Voice and tap-to-call** (built Oct 14). Voice is the keyboard's dictation, with check marks on phone, email and amount, dictation rules in the capture prompt, and a tip on phones. Phone numbers and emails in lookups are tappable. John to try on his iPhone: dictate a note with a phone number and email, and tap Linda Park's number.
+8. **Photos** (next): business cards, signs, attaching an image to a record. Plan to be agreed with John first.
+9. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
+10. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - A Vantage domain later.
-9. **Phase 3** (spec): voice, photos, vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
+11. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).

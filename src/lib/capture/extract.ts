@@ -61,7 +61,13 @@ Rules:
 - Highway numbers in New Jersey are usually interstates or routes: "295" means I-295, "73" means Route 73.
 - Write sizes out in full: "15 to 20k sf" becomes "15,000 to 20,000 sf".
 - follow_up_date is only for a specific day. "March", "next quarter", or "in a few weeks" leave it null and keep the words in follow_up_phrase.
-- If something is unclear (a garbled number, an ambiguous day, lease versus buy), leave that field empty and add one question to uncertain rather than choosing. Do not add a question just because only a first name was given; the app handles matching.`;
+- If something is unclear (a garbled number, an ambiguous day, lease versus buy), leave that field empty and add one question to uncertain rather than choosing. Do not add a question just because only a first name was given; the app handles matching.
+
+Notes are often dictated on a phone, so read spoken forms as what they mean:
+- Phone numbers said as words: "eight five six, five five five, oh one seven five" is 856-555-0175. "Oh" is zero. Write the digits. If a dictated number doesn't come to 10 digits (or 11 starting with 1), leave it out of phones and ask for it.
+- Emails said aloud: "linda at park medical dot com" is linda@parkmedical.com. If the spelling of any part is uncertain (a name heard by sound), leave it out of emails and ask the broker to type it.
+- Sizes and money said as words: "fifteen to twenty thousand square feet" is "15,000 to 20,000 sf"; "nine dollars a foot" is $9/sf (rent per square foot, so it goes in requirement_notes); "six hundred fifty thousand" is 650000.
+- Dictation can mishear names and words that sound alike. Don't correct a name to one you think is likelier; use it as written.`;
 
 // Opus 5.5 is the default. Sonnet 5.5 and Haiku 5.5 are being compared for
 // speed and accuracy (see docs/build-plan.md).

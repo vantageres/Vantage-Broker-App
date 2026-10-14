@@ -168,7 +168,7 @@ Brokers can type, speak, or send a photo, and all three lead to the same approva
 
 **Typing.** Free text in one message box. One message can cover several people or properties, and the app splits it into separate proposals.
 
-**Voice.** The broker taps the microphone, speaks, and sees the text before it is submitted. Names, phone numbers, and figures are shown back for checking because dictation often mishears them.
+**Voice.** On a phone, the broker taps the microphone on the phone's own keyboard, speaks, and sees the text in the message box before sending it. The app has no microphone of its own and never handles audio (decided Oct 14, 2026). Phone numbers, emails and dollar amounts on the approval card carry a reminder to check them, because dictation often mishears them. Desktop needs no voice; Windows and Mac have their own dictation.
 
 **Photos.** Taken with the camera or chosen from the photo library.
 
@@ -184,9 +184,10 @@ The app is designed for a phone first and works fully on a desktop browser.
 
 - **Install:** a web app brokers add to the home screen on iPhone and Android. No app store. Desktop runs in the browser.
 - **Sign in:** with each broker's own Monday account. The sign-in persists on the phone.
-- **Main screen:** a single conversation. A text box, a microphone button, and a camera button sit at the bottom, with the most recent proposals and answers above.
+- **Main screen:** a single conversation. A text box and a camera button sit at the bottom (voice is the keyboard's microphone), with the most recent proposals and answers above.
 - **Approval:** the Approve button is large and reachable with one thumb. Edits happen in place on the proposal.
 - **Live data:** every lookup reads Monday at the moment it is asked. The app is online only, with no offline capture in v1.
+- **Calling and email:** phone numbers and email addresses in answers open the phone's dialer and mail app with one tap.
 - **Activity:** a short list of what the broker saved today, each linking to its Monday record.
 - **Failures:** if Monday cannot be reached, the proposal is kept on screen and the save can be retried. The app never reports a save that did not happen.
 - **Speed:** proposed targets are a lookup answer in under 5 seconds and a capture proposal in under 10. These are to confirm during the pilot.

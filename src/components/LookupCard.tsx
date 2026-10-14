@@ -4,6 +4,27 @@ import { Out } from "./icons";
 const WHEN = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", year: "numeric" });
 const when = (iso: string) => WHEN.format(new Date(iso));
 
+// Phone numbers and emails open the phone's own dialer and mail app.
+function telHref(shown: string): string | null {
+  const digits = shown.replace(/\D/g, "");
+  if (digits.length === 10) return `tel:+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `tel:+${digits}`;
+  return digits.length >= 7 ? `tel:${shown.trim().startsWith("+") ? "+" : ""}${digits}` : null;
+}
+
+function FieldValue({ label, value }: { label: string; value: string }) {
+  if (label === "Phone") {
+    const href = telHref(value);
+    return href ? <a href={href}>{value}</a> : <>{value}</>;
+  }
+  if (label === "Email") {
+    // A field can hold more than one address; each gets its own link.
+    const parts = value.split(/([^\s,;<>]+@[^\s,;<>]+\.[^\s,;<>]+)/);
+    return <>{parts.map((part, i) => (i % 2 ? <a key={i} href={`mailto:${part}`}>{part}</a> : part))}</>;
+  }
+  return <>{value}</>;
+}
+
 // A Monday record as it stands, read only. Shows only what Monday holds.
 export function LookupCard({ answer }: { answer: LookupAnswer }) {
   const brokers = [answer.contactBroker || "No Contact Broker", answer.coBrokers && `Co-Broker: ${answer.coBrokers}`].filter(Boolean).join(" · ");
@@ -20,7 +41,7 @@ export function LookupCard({ answer }: { answer: LookupAnswer }) {
         {answer.fields.map((f) => (
           <div className="row lookup-row" key={f.label}>
             <span className="row-label">{f.label}</span>
-            <span className="row-value">{f.value}</span>
+            <span className="row-value"><FieldValue label={f.label} value={f.value} /></span>
           </div>
         ))}
         {answer.fields.length === 0 && <p className="inline-msg">No requirement or contact details in Monday yet.</p>}

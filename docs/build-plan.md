@@ -15,7 +15,7 @@ The spec leaves technical choices to the build. These are the defaults unless th
 | Sign-in | monday.com OAuth app, one token per broker | Each broker acts as themselves, so Monday history shows who changed what. |
 | Monday access | Monday GraphQL API, called from the server with the broker's token | Live reads, no local copy of records. |
 | Language work | Claude API with tool use and structured output | Turns notes into a typed proposal object. Vision reads business cards and signs. |
-| Voice | Phone's built-in dictation first; server transcription later if needed | Keyboard dictation already works in a PWA. Revisit in Phase 3. |
+| Voice | The phone keyboard's dictation; no in-app microphone (decided Oct 14) | Works in the installed app on iPhone and Android, needs nothing built, and the app never handles audio. |
 | App state | Small database (e.g. Postgres) for sessions, approval settings, and the "saved today" list | Holds app state only, never copies of Monday records. |
 
 ## Core design: the proposal object
@@ -86,7 +86,7 @@ Gate: two or three pilot brokers use it for real work and most proposals are app
 
 ## Phase 3: Voice, photos, properties, summaries (spec phase 3)
 
-- Voice input with a review step that highlights names, phone numbers, and figures.
+- Voice: the keyboard's dictation (decided Oct 14). The approval card marks new phone numbers ("Check every digit"), emails ("Check the spelling") and dollar amounts ("Check the amount"); capture reads spoken numbers, emails and sizes, and asks when a dictated number or spelling is unclear; phones show a tip to use the keyboard microphone.
 - Photos: business card, sign (Source = Sign), and attach-to-record. Ask for a clearer photo instead of guessing digits.
 - Property lookup across both property boards and suite subitems; property links on Leads and Contacts.
 - Property Leads lookup and edit; LA Signed settable with approval, other automation statuses refused with a "set this in Monday" message.
@@ -248,7 +248,9 @@ When nothing is named and nothing is found, the reply now says what can be asked
 
 **Finding (Oct 14): LA Signed starts the marketing automations.** Setting 22 Elm St (Property Leads Test) to LA Signed from the app, with today's LA Signed date: about 4 seconds later Monday began adding 11 marketing-checklist subitems (Submit Sign Request, Submit Brochure Request, Property Uploaded to Vantage Website, Property Uploaded to CoStar, Brochure Reviewed and in Marketing Folder, Sign Installed, Site Photography Requested, Site Photography Complete, Broker Commission Split Agreement Created and Signed, Social Media Post Schedule), then moved the lead from Leads to Pre-Listing, set Status to In Marketing and set In Marketing Date, all within 30 seconds. So LA Signed leads straight to In Marketing, which the spec treats as Monday-only. **Decided (John, Oct 14):** LA Signed stays settable from the app, with one plain line on the approval card: "This moves the listing into marketing." Other statuses haven't been tried; their line says "Monday may update this listing after the change."
 
-**Next slices:** model comparison (see "Claude model for capture").
+**Voice and tap-to-call (Oct 14):** Built as above. Also: phone numbers in lookups open the dialer (`tel:`), each email address opens mail (`mailto:`), and the approval card shows a budget as "$650,000". Tried in the local app at phone size with a saved extraction (no Claude call); the dictation rules in the capture prompt still need a real Claude run, on Vercel or with the key.
+
+**Next slices:** photos, then model comparison (see "Claude model for capture").
 
 **Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.
 
