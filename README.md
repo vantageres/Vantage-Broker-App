@@ -1,0 +1,36 @@
+# Vantage Broker Assistant
+
+Turns a broker's notes into Monday.com records, after the broker approves. See `docs/product-spec-v1.md` and `docs/build-plan.md`.
+
+## Running it
+
+```
+npm install
+npm run dev
+```
+
+Settings, in `.env.local` for development or the host's settings in production:
+
+| Variable | What it is |
+| --- | --- |
+| `SESSION_SECRET` | At least 32 random characters. Encrypts the sign-in cookie. |
+| `MONDAY_CLIENT_ID`, `MONDAY_CLIENT_SECRET` | The Monday OAuth app brokers sign in with. |
+| `APP_URL` | The app's address, e.g. `https://broker.vantageres.com`. The Monday app's redirect URL is `APP_URL/api/auth/callback`. |
+| `BROKER_APP_ANTHROPIC_KEY` | Vantage's Claude API key. |
+| `GOOGLE_MAPS_API_KEY` | Google Maps Geocoding key, for Desired Location. |
+
+Development only (ignored in production):
+
+| Variable | What it is |
+| --- | --- |
+| `MONDAY_DEV_PROXY_AUTH=1` | Shows "Development sign-in", which signs in as the owner of the environment's Monday token (added by the cloud environment's network secret). |
+| `DEV_EXTRACTION_FILE` | A saved extraction (JSON) used instead of calling Claude, to try the screens without a Claude key. |
+
+## Checks
+
+```
+npm test          # rules, matching, saving, memory
+npm run typecheck
+npx next build
+npm run try-capture -- "a note"   # a note against the test boards, read only
+```

@@ -61,6 +61,9 @@ export type Blocked =
   | { reason: "unassigned" };
 
 export interface Proposal {
+  // What Claude extracted, kept so the proposal can be rebuilt when the
+  // broker picks a match.
+  person: ExtractedPerson;
   subject: string;
   target: Target;
   blocked?: Blocked;
@@ -209,26 +212,24 @@ function pickList(candidates: MatchCandidate[]) {
   return candidates.map((c) => ({ ...ref(c.record), matchedOn: c.reasons }));
 }
 
-export function buildProposal(
+// A proposal for one person against a known record, or a new Lead when
+// `record` is null. Used after matching, and again when the broker picks a
+// match or chooses "someone new".
+export function proposalFor(
   person: ExtractedPerson,
-  records: PersonRecord[],
+  record: PersonRecord | null,
   me: Broker,
   noteText: string,
   today: string,
+  matchedOn: string[] = [],
 ): Proposal {
   const placedInNotes: Proposal["placedInNotes"] = [];
   const values = proposedValues(person, placedInNotes);
   const questions = questionsFor(person, today);
   const subject = person.name ?? person.business_name ?? "Unnamed person";
+  const base = { person, subject, noteText, placedInNotes, questions, automations: [] as string[] };
 
-  const match: MatchResult = findMatches(
-    { name: person.name, businessName: person.business_name, phones: person.phones, emails: person.emails },
-    records,
-  );
-
-  const base = { subject, noteText, placedInNotes, questions, automations: [] as string[] };
-
-  if (match.kind === "none") {
+  if (!record) {
     const changes: FieldChange[] = [
       { field: "name", label: LABELS.name, current: "", proposed: subject },
       ...diff(values),
@@ -238,28 +239,7 @@ export function buildProposal(
     return { ...base, target: { kind: "new-lead" }, changes };
   }
 
-  if (match.kind === "several" || match.kind === "both-boards") {
-    const candidates = match.kind === "several" ? match.candidates : [match.recommended, match.other];
-    const recommended = match.kind === "both-boards" ? match.recommended.record.id : undefined;
-    return {
-      ...base,
-      target: { kind: "pick", candidates: pickList(candidates), recommended },
-      changes: [],
-      questions: [
-        {
-          field: "match",
-          question:
-            match.kind === "both-boards"
-              ? `${subject} is in both Leads and Contacts. I recommend updating the Contacts record. Which one?`
-              : `I found ${candidates.length} possible matches for ${subject}. Which one is it, or is this someone new?`,
-        },
-        ...questions,
-      ],
-    };
-  }
-
-  const record = match.candidate.record;
-  const target: Target = { kind: "existing", record: ref(record), matchedOn: match.candidate.reasons };
+  const target: Target = { kind: "existing", record: ref(record), matchedOn };
 
   if (!isOwner(record, me)) {
     const blocked: Blocked =
@@ -293,6 +273,49 @@ export function buildProposal(
   const automations: string[] = [];
   if (record.board.key === "contacts") {
     automations.push("Saving a note on a Contact starts the Monday automation that moves Follow Up Date about six months out.");
+  } else {
+    // Seen on Leads Test, Oct 14: the note sets Last Contact, and an automation
+    // then resets Follow Up Date (a week out) and Open Contact Date.
+    automations.push("Saving a note on a Lead starts a Monday automation that resets Follow Up Date to a week out and changes Open Contact Date, replacing any date set here.");
   }
   return { ...base, target, changes: diff(values, record), questions: openQuestions, automations };
+}
+
+export function buildProposal(
+  person: ExtractedPerson,
+  records: PersonRecord[],
+  me: Broker,
+  noteText: string,
+  today: string,
+): Proposal {
+  const match: MatchResult = findMatches(
+    { name: person.name, businessName: person.business_name, phones: person.phones, emails: person.emails },
+    records,
+  );
+  if (match.kind === "none") return proposalFor(person, null, me, noteText, today);
+  if (match.kind === "one") return proposalFor(person, match.candidate.record, me, noteText, today, match.candidate.reasons);
+
+  const subject = person.name ?? person.business_name ?? "Unnamed person";
+  const candidates = match.kind === "several" ? match.candidates : [match.recommended, match.other];
+  const recommended = match.kind === "both-boards" ? match.recommended.record.id : undefined;
+  return {
+    person,
+    subject,
+    noteText,
+    placedInNotes: [],
+    automations: [],
+    target: { kind: "pick", candidates: pickList(candidates), recommended },
+    changes: [],
+    // Only the match question for now: the rest depend on which record is picked.
+    questions: [
+      {
+        field: "match",
+        question:
+          match.kind === "both-boards"
+            ? `${subject} is in both Leads and Contacts. I recommend updating the Contacts record. Which one?`
+            : `I found ${candidates.length} possible matches for ${subject}. Which one is it, or is this someone new?`,
+      },
+      ...questionsFor(person, today),
+    ],
+  };
 }

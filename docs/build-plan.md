@@ -208,3 +208,19 @@ Round 2 (added to the canvas Oct 14, for review): pick a match by first name, re
 8. Several people in one note: one card each.
 9. "Saved today" list.
 10. Approval settings admin page (desktop only, Operations Manager).
+
+## Phase 2 progress
+
+**Slice 1 (Oct 14, 2026): capture end to end.** Built and tried in a browser against the test boards:
+
+- Sign-in with Monday (OAuth, each broker as themselves; persists 30 days), plus a development-only sign-in.
+- Conversation screen, approval card with in-place editing, one question at a time, pick a match, someone else's record, claim, save with retry (a note that fails after the fields saved is retried on its own), Saved today from Monday's activity log, sign out.
+- Server re-checks ownership just before every write; claims re-read the owner before and after.
+- Matching data is kept per chat session and dropped after 10 idle minutes.
+- Installable basics: web manifest and icons.
+
+A real save to Linda Park (Leads Test) wrote Notes, Follow Up Date and the Broker Note correctly. Test records were restored afterwards.
+
+**Finding:** on Leads Test, adding a Broker Note sets Last Contact, and a Monday automation then resets Follow Up Date to a week out and changes Open Contact Date. It overwrote the date the broker approved. The approval card now warns about it. Decision needed: change the automation (e.g. only set Follow Up Date when it is empty), or keep it.
+
+**Next slices:** lookups on Leads and Contacts; approval settings page (needs the hosting and database decision); service worker for the installed app; Monday OAuth app and hosting set-up.

@@ -85,6 +85,7 @@ Created by `scripts/seed_test_boards.py` on Oct 13, 2026. Item ids are in `docs/
   - Property Leads Test: Status "New Lead", GEN FOLDER LA "New", Date Created, County, and Zip Code were filled automatically.
   - Vantage Leads Test: on Tom Alvarez (Source Sign, unassigned), Open Contact Date and Follow Up Date were reset by an automation.
   - Vantage Contacts Test: none.
+- Oct 14: adding a Broker Note to a Lead sets Last Contact (Emails & Activities), and a Leads Test automation then resets Follow Up Date to a week out and Open Contact Date to two weeks out. Seen on Linda Park.
 
 ## Spike results (Oct 13, 2026)
 

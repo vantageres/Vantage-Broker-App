@@ -4,6 +4,7 @@ import { googleGeocoder, resolveLocations } from "./geocode";
 
 function proposalWith(place: string): Proposal {
   return {
+    person: {} as Proposal["person"],
     subject: "Dave Reyes",
     target: { kind: "new-lead" },
     changes: [{ field: "desiredLocation", label: "Desired Location", current: "", proposed: place }],
