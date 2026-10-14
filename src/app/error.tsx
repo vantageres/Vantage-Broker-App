@@ -24,6 +24,11 @@ export default function ErrorScreen({ error, retry }: { error: Error & { digest?
       <p className="inline-msg" style={{ maxWidth: 360, overflowWrap: "anywhere" }}>
         Details: {error.message || "no message"}{error.digest ? ` (ref ${error.digest})` : ""}
       </p>
+      {error.stack && (
+        <pre className="inline-msg" style={{ maxWidth: 360, whiteSpace: "pre-wrap", overflowWrap: "anywhere", textAlign: "left", fontSize: 11 }}>
+          {error.stack.split("\n").slice(0, 5).join("\n")}
+        </pre>
+      )}
       <button className="approve" onClick={() => retry()}>Try again</button>
       <a className="secondary" href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>Start over</a>
     </main>
