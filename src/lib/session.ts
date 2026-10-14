@@ -44,10 +44,11 @@ export async function getSession() {
   return getIronSession<BrokerSession>(await cookies(), sessionOptions());
 }
 
-// In this development environment the Monday token is added to requests by
-// the network proxy, so a dev session carries none. Never allowed in production.
+// In development the Monday token comes from the environment (the cloud
+// network proxy, or MONDAY_DEV_TOKEN on a PC), so a dev session carries none.
+// Never allowed in production.
 export function devProxyAuth(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.MONDAY_DEV_PROXY_AUTH === "1";
+  return process.env.NODE_ENV !== "production" && (process.env.MONDAY_DEV_PROXY_AUTH === "1" || !!process.env.MONDAY_DEV_TOKEN);
 }
 
 export interface SignedIn {

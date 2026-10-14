@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "try-capture": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/try-capture.ts"
+    "try-capture": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/try-capture.ts",
+    "try-lookup": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/try-lookup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

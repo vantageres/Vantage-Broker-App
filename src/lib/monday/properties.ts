@@ -2,8 +2,7 @@ import type { MondayClient } from "./client";
 
 // The two property boards, read only: Properties New (suites in subitems) and
 // the old Properties board, looked up together until the migration finishes.
-// Column ids come from the test boards (docs/monday-test-boards.md and
-// scripts/seed_test_boards.py). The sensitive columns (Key for Broker, loans,
+// Column ids are the test boards' (read back from Monday on Oct 14, 2026). The sensitive columns (Key for Broker, loans,
 // lender) are never requested, so they can't reach a search or a summary.
 
 export type PropertyBoardKey = "propertiesNew" | "propertiesOld";
@@ -17,7 +16,9 @@ export interface PropertyBoard {
     location: string;
     broker: string;
     coBroker?: string;
-    deal: string; // Sale, Lease, Sale or Lease
+    coBroker2?: string;
+    deal: string; // Sale, Lease, Sale or Lease (Monday calls it "Property Type")
+    // "Property Description" on these boards holds the type (Retail, Industrial…).
     type?: string;
     sqft?: string;
     acres?: string;
@@ -39,7 +40,7 @@ export const TEST_PROPERTY_BOARDS: Record<PropertyBoardKey, PropertyBoard> = {
     key: "propertiesNew",
     label: "Properties New",
     boardId: "18435327265",
-    columns: { status: "status", location: "location", broker: "person", coBroker: "people", deal: "status_15" },
+    columns: { status: "status", location: "location", broker: "person", coBroker: "people", coBroker2: "multiple_person_mm6dtf87", deal: "status_15", leaseType: "text5" },
     suiteColumns: {
       sqft: "numbers15",
       status: "status6",
@@ -57,6 +58,7 @@ export const TEST_PROPERTY_BOARDS: Record<PropertyBoardKey, PropertyBoard> = {
       status: "status",
       location: "location",
       broker: "person",
+      coBroker: "people",
       deal: "status_15",
       type: "dropdown97",
       sqft: "numbers7",
@@ -147,7 +149,7 @@ export function toPropertyRecord(board: PropertyBoard, item: RawItem, accountSlu
     acres: toNumber(t(c.acres)),
     price: toNumber(t(c.price)),
     leaseType: t(c.leaseType),
-    brokers: [t(c.broker), t(c.coBroker)].filter(Boolean).join(", "),
+    brokers: [t(c.broker), t(c.coBroker), t(c.coBroker2)].filter(Boolean).join(", "),
     suites,
   };
 }

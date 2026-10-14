@@ -25,6 +25,7 @@ Development only (ignored in production):
 
 | Variable | What it is |
 | --- | --- |
+| `MONDAY_DEV_TOKEN` | A personal Monday token, for development on a PC. "Development sign-in" and the scripts use it. While it is in use, writes outside the Broker App Test workspace are refused. |
 | `MONDAY_DEV_PROXY_AUTH=1` | Shows "Development sign-in", which signs in as the owner of the environment's Monday token (added by the cloud environment's network secret). |
 | `DEV_EXTRACTION_FILE` | A saved extraction (JSON) used instead of calling Claude, to try the screens without a Claude key. |
 
@@ -37,4 +38,12 @@ npm test          # rules, matching, saving, lookups, memory, approvals, sign-in
 npm run typecheck
 npx next build
 npm run try-capture -- "a note"   # a note against the test boards, read only
+npm run try-lookup -- "a question"   # a question against the test boards, read only
+```
+
+On Windows the npm scripts above that set variables (`dev`, `try-capture`, `try-lookup`) need a POSIX shell. Run them directly instead:
+
+```
+npx next dev
+npx tsx --env-file=.env.local scripts/try-lookup.ts "retail around 2,000 sf"
 ```

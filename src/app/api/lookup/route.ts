@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lookup } from "@/lib/capture/service";
 import { fail, withBroker } from "@/lib/api";
-import { mondayReason } from "@/lib/monday/client";
+import { MondayError, mondayReason } from "@/lib/monday/client";
 
 // Read only: lookups never change Monday, so they need no approval.
 export async function POST(req: Request) {
@@ -13,7 +13,9 @@ export async function POST(req: Request) {
     } catch (error) {
       const reason = mondayReason(error);
       console.error(`[lookup] ${reason}`);
-      return fail(new Error(`Monday didn't answer the lookup, so I couldn't look that up. (${reason})`));
+      // Name the part that failed: Monday, or the summary (Claude).
+      const what = error instanceof MondayError ? "Monday didn't answer the lookup, so I couldn't look that up." : "I couldn't write that summary.";
+      return fail(new Error(`${what} (${reason})`));
     }
   });
 }
