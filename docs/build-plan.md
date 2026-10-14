@@ -194,7 +194,7 @@ Canvas: https://claude.ai/artifact/AN33vsn4sYWVs8vRs1JSbn (first round, Oct 14, 
 
 Look: Manrope; navy #1D3F7E for text and links, orange #D2461A for the main action, light grey #F4F5F8 ground, Vantage Commercial logo in the header.
 
-**Decided Oct 14:** values are edited in place on the proposal (tap a value); there is no separate Edit button.
+**Decided Oct 14:** values are edited in place on the proposal (tap a value); there is no separate Edit button. "Approve Linda now" stays: when one note covers several people, a broker can save one while the other still has open questions. Every screen's header has a Saved today link.
 
 Round 2 (added to the canvas Oct 14, for review): pick a match by first name, review with in-place editing, two people in one note with "Question 1 of 2" and an automation line, map check for a partial match, someone else's record, claim an unassigned record, save failed with retry, saved today, and the desktop approval settings page. Covers:
 
