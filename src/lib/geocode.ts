@@ -8,6 +8,9 @@ export interface MapPoint {
   lat: number;
   lng: number;
   address: string;
+  // Google matched only part of the place name, e.g. "old Bergen Mill site"
+  // became "Bergen Mills, Millstone Township". Treat as a guess.
+  partial?: boolean;
 }
 
 export type Geocoder = (place: string) => Promise<MapPoint | null>;
@@ -28,28 +31,41 @@ export function googleGeocoder(apiKey: string, fetchImpl: typeof fetch = fetch):
     const body = (await res.json()) as {
       status: string;
       error_message?: string;
-      results: { formatted_address: string; geometry: { location: { lat: number; lng: number } } }[];
+      results: {
+        formatted_address: string;
+        partial_match?: boolean;
+        geometry: { location: { lat: number; lng: number } };
+      }[];
     };
     if (body.status === "ZERO_RESULTS") return null;
     if (body.status !== "OK") throw new Error(`Google Maps: ${body.status} ${body.error_message ?? ""}`.trim());
     const [best] = body.results;
-    return { lat: best.geometry.location.lat, lng: best.geometry.location.lng, address: best.formatted_address };
+    return {
+      lat: best.geometry.location.lat,
+      lng: best.geometry.location.lng,
+      address: best.formatted_address,
+      partial: best.partial_match === true,
+    };
   };
 }
 
 // Attach a map point to the proposed Desired Location. If the place can't be
-// found, the field is dropped from the proposal and the broker is asked.
+// found, or Google only matched part of it, the field is left out and the
+// broker is asked instead of saving a guess.
 export async function resolveLocations(proposal: Proposal, geocode: Geocoder): Promise<Proposal> {
   const change = proposal.changes.find((c) => c.field === "desiredLocation");
   if (!change) return proposal;
   const point = await geocode(change.proposed);
-  if (point) return { ...proposal, changes: proposal.changes.map((c) => (c === change ? { ...c, location: point } : c)) };
+  if (point && !point.partial) {
+    const location = { lat: point.lat, lng: point.lng, address: point.address };
+    return { ...proposal, changes: proposal.changes.map((c) => (c === change ? { ...c, location } : c)) };
+  }
+  const question = point
+    ? `For "${change.proposed}" the map found ${point.address}. Is that the right place, or which town or address should I use?`
+    : `I couldn't find "${change.proposed}" on the map. Which town or address should I use?`;
   return {
     ...proposal,
     changes: proposal.changes.filter((c) => c !== change),
-    questions: [
-      ...proposal.questions,
-      { field: "desiredLocation", question: `I couldn't find "${change.proposed}" on the map. Which town or address should I use?` },
-    ],
+    questions: [...proposal.questions, { field: "desiredLocation", question }],
   };
 }

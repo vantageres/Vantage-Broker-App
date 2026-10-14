@@ -155,6 +155,33 @@ describe("buildProposal", () => {
     expect(p.questions.map((q) => q.field)).toEqual(["match", "followUp", "contactType"]);
   });
 
+  it("adds to existing Notes instead of replacing them", () => {
+    const base = record({ name: "x" }).current;
+    const linda = record({ name: "Linda Park", current: { ...base, notes: "First-floor medical office, ADA access" } });
+    const p = buildProposal(person({ name: "Linda Park", requirement_notes: "Needs 20 parking spaces" }), [linda], ME, "note", TODAY);
+    expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("First-floor medical office, ADA access. Needs 20 parking spaces");
+  });
+
+  it("does not ask about a field the record already fills", () => {
+    const base = record({ name: "x" }).current;
+    const linda = record({ name: "Linda Park", current: { ...base, contactType: "Leasee" } });
+    const p = buildProposal(
+      person({ name: "Linda Park", uncertain: [{ field: "contact_type", question: "Lease or buy?" }] }),
+      [linda], ME, "note", TODAY,
+    );
+    expect(p.questions).toEqual([]);
+  });
+
+  it("still asks when the field is only 'Not Set'", () => {
+    const base = record({ name: "x" }).current;
+    const sam = record({ name: "Sam Whitaker", current: { ...base, contactType: "Not Set" } });
+    const p = buildProposal(
+      person({ name: "Sam Whitaker", uncertain: [{ field: "contact_type", question: "Lease or buy?" }] }),
+      [sam], ME, "note", TODAY,
+    );
+    expect(p.questions).toHaveLength(1);
+  });
+
   it("shows the follow-up date with its weekday", () => {
     const p = buildProposal(person({ name: "Linda Park", follow_up_date: "2026-10-20" }), [], ME, "note", TODAY);
     expect(p.changes.find((c) => c.field === "followUp")).toMatchObject({

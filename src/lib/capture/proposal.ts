@@ -188,6 +188,12 @@ function diff(values: Partial<Record<RequirementField, string>>, current?: Perso
       changes.push({ field, label: LABELS[field], current: now, proposed: merged });
       continue;
     }
+    if (field === "notes" && now) {
+      // Notes are added to, never replaced, so earlier details are kept.
+      if (now.toLowerCase().includes(proposed.trim().toLowerCase())) continue;
+      changes.push({ field, label: LABELS[field], current: now, proposed: `${now.trim().replace(/[.;]$/, "")}. ${proposed}` });
+      continue;
+    }
     if (now.trim().toLowerCase() === proposed.trim().toLowerCase()) continue;
     const change: FieldChange = { field, label: LABELS[field], current: now, proposed };
     if (field === "followUp") {
@@ -261,9 +267,16 @@ export function buildProposal(
     return { ...base, target, blocked, changes: [], placedInNotes: [], questions: [] };
   }
 
+  // Claude's doubts about a field the record already fills don't need asking:
+  // the note proposes no change there, and the current value stays.
+  const unset = new Set(["", "not set", "not labeled"]);
+  const filled = (field: string) =>
+    field in record.current && !unset.has(record.current[field as RequirementField].trim().toLowerCase());
+  const openQuestions = questions.filter((q) => q.field === "followUp" || !filled(q.field));
+
   const automations: string[] = [];
   if (record.board.key === "contacts") {
     automations.push("Saving a note on a Contact starts the Monday automation that moves Follow Up Date about six months out.");
   }
-  return { ...base, target, changes: diff(values, record), automations };
+  return { ...base, target, changes: diff(values, record), questions: openQuestions, automations };
 }

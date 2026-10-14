@@ -35,6 +35,20 @@ describe("resolveLocations", () => {
     expect(p.questions[0].field).toBe("desiredLocation");
   });
 
+  it("asks instead of trusting a partial match", async () => {
+    const geocode = googleGeocoder("key", fakeFetch({
+      status: "OK",
+      results: [{
+        formatted_address: "Bergen Mills, Millstone Township, NJ 08535, USA",
+        partial_match: true,
+        geometry: { location: { lat: 40.2, lng: -74.4 } },
+      }],
+    }));
+    const p = await resolveLocations(proposalWith("the old Bergen Mill site"), geocode);
+    expect(p.changes).toEqual([]);
+    expect(p.questions[0].question).toContain("Bergen Mills, Millstone Township");
+  });
+
   it("reports a Google error instead of hiding it", async () => {
     const geocode = googleGeocoder("key", fakeFetch({ status: "REQUEST_DENIED", error_message: "bad key", results: [] }));
     await expect(resolveLocations(proposalWith("Mount Laurel, NJ"), geocode)).rejects.toThrow("REQUEST_DENIED");

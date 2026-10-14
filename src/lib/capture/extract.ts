@@ -53,6 +53,7 @@ Rules:
 - Use only what the note says. Never invent or infer a phone number, email, date, or amount.
 - One entry per person. If the note covers several people, return several entries.
 - Budget is a single total dollar amount. Rent per square foot, price ranges, and lease terms go in requirement_notes instead.
+- requirement_notes is only for new details that no other field holds. Never repeat a value that has its own field, and never write filler such as "requirement updated". Leave it null when there is nothing to add.
 - desired_location holds one place. Put any further areas in extra_locations.
 - Highway numbers in New Jersey are usually interstates or routes: "295" means I-295, "73" means Route 73.
 - Write sizes out in full: "15 to 20k sf" becomes "15,000 to 20,000 sf".
