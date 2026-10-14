@@ -19,7 +19,11 @@ export function Conversation({ firstName }: { firstName: string }) {
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [entries]);
+  // Block body on purpose: newer Chrome returns a promise from scrollIntoView,
+  // and React would treat a returned value as the effect's cleanup function.
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [entries]);
 
   async function send(note: string, echo = true) {
     if (!note.trim() || busy) return;
