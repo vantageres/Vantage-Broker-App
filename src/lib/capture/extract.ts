@@ -26,6 +26,8 @@ export const ExtractedPerson = z.object({
   desired_location: z.string().nullable()
     .describe('One place, written so it can be found on a map, e.g. "I-295, NJ" or "Mount Laurel, NJ"'),
   extra_locations: z.array(z.string()).describe("Any further areas beyond the first"),
+  location_is_addition: z.boolean()
+    .describe('True when the note adds desired_location to areas already being considered ("also near Route 73"), false when it replaces them or is the only area'),
   follow_up_phrase: z.string().nullable()
     .describe("The broker's own words about when to follow up, if any"),
   follow_up_date: z.string().nullable()
@@ -54,6 +56,7 @@ Rules:
 - One entry per person. If the note covers several people, return several entries.
 - Budget is a single total dollar amount. Rent per square foot, price ranges, and lease terms go in requirement_notes instead.
 - requirement_notes is only for new details that no other field holds. Never repeat a value that has its own field, and never write filler such as "requirement updated". Leave it null when there is nothing to add.
+- A named site, building, or property the person is interested in ("the old Bergen Mill site") is a new detail: put it in requirement_notes as well as properties_mentioned. Only put it in desired_location if it is a town, road, or address that can be found on a map.
 - desired_location holds one place. Put any further areas in extra_locations.
 - Highway numbers in New Jersey are usually interstates or routes: "295" means I-295, "73" means Route 73.
 - Write sizes out in full: "15 to 20k sf" becomes "15,000 to 20,000 sf".

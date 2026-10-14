@@ -32,7 +32,7 @@ function person(overrides: Partial<ExtractedPerson>): ExtractedPerson {
     name: null, business_name: null, title: null, phones: [], emails: [],
     contact_type: null, property_types: [], size: null, budget: null,
     desired_location: null, extra_locations: [], follow_up_phrase: null,
-    follow_up_date: null, source: null, requirement_notes: null,
+    follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false,
     properties_mentioned: [], uncertain: [],
     ...overrides,
   };
@@ -180,6 +180,35 @@ describe("buildProposal", () => {
       [sam], ME, "note", TODAY,
     );
     expect(p.questions).toHaveLength(1);
+  });
+
+  it("still asks about a place when the record already has one", () => {
+    const base = record({ name: "x" }).current;
+    const grace = record({ name: "Grace Kim", current: { ...base, desiredLocation: "Pennsauken Township, NJ, USA" } });
+    const p = buildProposal(
+      person({ name: "Grace Kim", uncertain: [{ field: "desired_location", question: "What town is the old Bergen Mill site in?" }] }),
+      [grace], ME, "note", TODAY,
+    );
+    expect(p.questions.map((q) => q.field)).toEqual(["desiredLocation"]);
+  });
+
+  it("adds an 'also' area to Notes and keeps the current Desired Location", () => {
+    const base = record({ name: "x" }).current;
+    const linda = record({ name: "Linda Park", current: { ...base, desiredLocation: "Cherry Hill, NJ, USA" } });
+    const p = buildProposal(
+      person({ name: "Linda Park", desired_location: "Route 73, NJ", location_is_addition: true }),
+      [linda], ME, "note", TODAY,
+    );
+    expect(p.changes.find((c) => c.field === "desiredLocation")).toBeUndefined();
+    expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("Also considering: Route 73, NJ");
+    expect(p.placedInNotes[0].why).toContain("Cherry Hill");
+  });
+
+  it("replaces Desired Location when the note isn't an addition", () => {
+    const base = record({ name: "x" }).current;
+    const linda = record({ name: "Linda Park", current: { ...base, desiredLocation: "Cherry Hill, NJ, USA" } });
+    const p = buildProposal(person({ name: "Linda Park", desired_location: "Mount Laurel, NJ" }), [linda], ME, "note", TODAY);
+    expect(p.changes.find((c) => c.field === "desiredLocation")?.proposed).toBe("Mount Laurel, NJ");
   });
 
   it("shows the follow-up date with its weekday", () => {

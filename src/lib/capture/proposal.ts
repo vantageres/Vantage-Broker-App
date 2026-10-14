@@ -267,12 +267,28 @@ export function buildProposal(
     return { ...base, target, blocked, changes: [], placedInNotes: [], questions: [] };
   }
 
-  // Claude's doubts about a field the record already fills don't need asking:
-  // the note proposes no change there, and the current value stays.
   const unset = new Set(["", "not set", "not labeled"]);
   const filled = (field: string) =>
     field in record.current && !unset.has(record.current[field as RequirementField].trim().toLowerCase());
-  const openQuestions = questions.filter((q) => q.field === "followUp" || !filled(q.field));
+
+  // Claude often can't tell lease from buy, or the source, from a short note.
+  // If the record already says, keep it and don't ask. Doubts about anything
+  // else (a place, a size, a number) mean the note wants a change, so ask.
+  const settledByRecord = new Set(["contactType", "source"]);
+  const openQuestions = questions.filter((q) => !(settledByRecord.has(q.field) && filled(q.field)));
+
+  // "Also near Route 73": Desired Location holds one place, so an added area
+  // goes in Notes and the current place stays.
+  if (person.location_is_addition && values.desiredLocation && filled("desiredLocation")) {
+    const place = values.desiredLocation;
+    delete values.desiredLocation;
+    const extra = `Also considering: ${place}`;
+    values.notes = values.notes ? `${values.notes}. ${extra}` : extra;
+    placedInNotes.push({
+      text: place,
+      why: `Desired Location already holds ${record.current.desiredLocation} and can hold only one place, so ${place} is added to Notes.`,
+    });
+  }
 
   const automations: string[] = [];
   if (record.board.key === "contacts") {
