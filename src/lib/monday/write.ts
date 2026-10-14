@@ -1,4 +1,5 @@
 import type { MondayClient } from "./client";
+import type { Photo } from "../capture/extract";
 import { BROKER_NOTE_ACTIVITY_ID, CONTACT_TYPES, PROPERTY_TYPES, SOURCES, type PersonBoard } from "./boards";
 
 // Writes an approved proposal to Monday. Every check that protects a record
@@ -7,7 +8,7 @@ import { BROKER_NOTE_ACTIVITY_ID, CONTACT_TYPES, PROPERTY_TYPES, SOURCES, type P
 
 export type SaveField =
   | "name" | "businessName" | "contactType" | "propertyType" | "budget" | "size"
-  | "desiredLocation" | "notes" | "followUp" | "source" | "phone" | "email";
+  | "desiredLocation" | "notes" | "followUp" | "source" | "phone" | "email" | "contactAddress";
 
 export interface SaveChange {
   field: SaveField;
@@ -19,6 +20,8 @@ export interface SaveRequest {
   target: { kind: "existing"; board: "leads" | "contacts"; id: string } | { kind: "new-lead" };
   changes: SaveChange[];
   noteText: string;
+  // Approved photos for the record's Files column (a business card, front and back).
+  photos?: Photo[];
 }
 
 export interface Me {
@@ -26,12 +29,29 @@ export interface Me {
   name: string;
 }
 
-// The fields were saved but the Broker Note was not. Retrying sends only the
-// note, to the record in `result`.
+// The fields were saved but a photo or the Broker Note was not. Retrying sends
+// only what's missing (`result.photosAttached` says how many photos made it),
+// to the record in `result`.
 export class NoteNotSaved extends Error {
-  constructor(readonly result: SaveResult) {
-    super("The changes were saved, but the note wasn't added.");
+  constructor(readonly result: SaveResult, what: "note" | "photo") {
+    super(what === "photo" ? "The changes were saved, but the photo wasn't attached." : "The changes were saved, but the note wasn't added.");
   }
+}
+
+const MAX_PHOTOS = 2;
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+const EXTENSION: Record<Photo["mediaType"], string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+// Photos arrive from the browser: check them before anything is saved.
+export function checkPhotos(photos: unknown): Photo[] {
+  if (photos === undefined) return [];
+  if (!Array.isArray(photos) || photos.length > MAX_PHOTOS) throw new SaveRefused(`Send at most ${MAX_PHOTOS} photos.`);
+  return photos.map((p) => {
+    const photo = p as Photo;
+    if (!photo || typeof photo.data !== "string" || !(photo.mediaType in EXTENSION)) throw new SaveRefused("That photo couldn't be read.");
+    if ((photo.data.length * 3) / 4 > MAX_PHOTO_BYTES) throw new SaveRefused("That photo is too large.");
+    return { data: photo.data, mediaType: photo.mediaType };
+  });
 }
 
 export class SaveRefused extends Error {
@@ -79,6 +99,10 @@ export function columnValue(board: PersonBoard, change: SaveChange): [string, un
     case "desiredLocation":
       if (!change.location) throw new SaveRefused("Desired Location needs a place found on the map.");
       return [c.desiredLocation, { lat: String(change.location.lat), lng: String(change.location.lng), address: change.location.address }];
+    case "contactAddress":
+      if (!c.contactAddress) throw new SaveRefused("Leads have no address field. Put the address in Notes.");
+      if (!change.location) throw new SaveRefused("Contact Address needs an address found on the map.");
+      return [c.contactAddress, { lat: String(change.location.lat), lng: String(change.location.lng), address: change.location.address }];
     case "phone": {
       const digits = v.replace(/\D/g, "");
       if (digits.length < 10) throw new SaveRefused("That phone number looks incomplete.");
@@ -134,6 +158,7 @@ export interface SaveResult {
   name: string;
   fieldsChanged: number;
   noteAdded: boolean;
+  photosAttached: number;
 }
 
 export async function saveProposal(
@@ -143,6 +168,7 @@ export async function saveProposal(
   request: SaveRequest,
 ): Promise<SaveResult> {
   const note = request.noteText.trim();
+  const photos = checkPhotos(request.photos);
 
   if (request.target.kind === "new-lead") {
     const board = boards.leads;
@@ -162,8 +188,8 @@ export async function saveProposal(
        }`,
       { board: board.boardId, name, values: JSON.stringify(values) },
     );
-    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length, noteAdded: false };
-    return withNote(monday, result, note);
+    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length, noteAdded: false, photosAttached: 0 };
+    return afterFields(monday, board, result, photos, note);
   }
 
   const board = boards[request.target.board];
@@ -189,17 +215,30 @@ export async function saveProposal(
       { board: board.boardId, item: itemId, values: JSON.stringify(values) },
     );
   }
-  return withNote(monday, { board: board.key, itemId, name: owners.name, fieldsChanged: Object.keys(values).length, noteAdded: false }, note);
+  const result: SaveResult = { board: board.key, itemId, name: owners.name, fieldsChanged: Object.keys(values).length, noteAdded: false, photosAttached: 0 };
+  return afterFields(monday, board, result, photos, note);
 }
 
-async function withNote(monday: MondayClient, result: SaveResult, note: string): Promise<SaveResult> {
-  if (!note) return result;
+// After the fields: the photos to Files, then the Broker Note.
+async function afterFields(monday: MondayClient, board: PersonBoard, result: SaveResult, photos: Photo[], note: string): Promise<SaveResult> {
+  let done = result;
+  for (const [i, photo] of photos.entries()) {
+    try {
+      if (!monday.uploadFile) throw new Error("No file upload");
+      const name = `photo-${new Date().toISOString().slice(0, 10)}-${i + 1}.${EXTENSION[photo.mediaType]}`;
+      await monday.uploadFile(result.itemId, board.columns.files, { name, type: photo.mediaType, data: Uint8Array.from(Buffer.from(photo.data, "base64")) });
+    } catch {
+      throw new NoteNotSaved(done, "photo");
+    }
+    done = { ...done, photosAttached: done.photosAttached + 1 };
+  }
+  if (!note) return done;
   try {
     await addBrokerNote(monday, result.itemId, note);
   } catch {
-    throw new NoteNotSaved(result);
+    throw new NoteNotSaved(done, "note");
   }
-  return { ...result, noteAdded: true };
+  return { ...done, noteAdded: true };
 }
 
 // Claiming sets the broker as Contact Broker on an unassigned record. Monday

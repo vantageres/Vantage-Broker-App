@@ -250,7 +250,13 @@ When nothing is named and nothing is found, the reply now says what can be asked
 
 **Voice and tap-to-call (Oct 14):** Built as above. Also: phone numbers in lookups open the dialer (`tel:`), each email address opens mail (`mailto:`), and the approval card shows a budget as "$650,000". Tried in the local app at phone size with a saved extraction (no Claude call); the dictation rules in the capture prompt still need a real Claude run, on Vercel or with the key.
 
-**Next slices:** photos, then model comparison (see "Claude model for capture").
+**Photos, decided with John (Oct 14):** a camera button in the composer on phone and desktop (the phone offers Take Photo or Photo Library). A second photo, such as a card's back, is optional ("Add the back (optional)"). Photos are shrunk on the device to a JPEG of about 1,600 pixels before sending, go to Claude inline, and reach Monday only on approval; the server keeps no copy. The Broker Note for a photo is one short line ("Added from a business card.") plus anything typed. Signs will use the phone's location, with permission, to find the property. Built in three steps, each tested before the next:
+
+1. **Business cards (built Oct 14).** Claude reads name, title, business, phones, emails and address, and the card works like a typed note: matching, a new Lead or an update, check marks on phone and email. Title goes to Notes; address goes to Contact Address on Contacts (a map column, found on the map like Desired Location) and to Notes on Leads, with the reason shown. If a digit or letter can't be read, that value is left out and the broker is asked; if the photo can't be used at all, the app asks for a clearer one. On approval the photos go to the record's Files column after the fields and before the note; if one fails, the retry sends only what's missing. Tried end to end in the local app on Dave Reyes (Leads Test) with a saved reading in place of Claude: Notes, the photo in Files and the short note all landed, then Dave was restored. The reading itself needs a real Claude run (live site).
+2. **Signs** (next): Source = Sign, matching by the sign's phone number, the phone's location to find the property, and a property link.
+3. **Attach a photo to a record**, including Property Leads.
+
+**Next slices:** photo steps 2 and 3, then model comparison (see "Claude model for capture").
 
 **Sign-in update (Oct 14):** Monday requires OAuth 2.1 for tokens since Oct 1, 2026: PKCE (S256) on the authorize step, a new token address (`auth.monday.com/oauth_ms/oauth/token`), and access tokens that expire (reported 24 hours) with single-use refresh tokens. The app now uses that flow and renews tokens before they expire, one renewal at a time per sign-in. The Monday app needs its "New OAuth Flow" setting on.
 

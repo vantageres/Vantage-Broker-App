@@ -5,7 +5,7 @@ import { CONTACT_TYPES, PROPERTY_TYPES, SOURCES } from "../monday/boards";
 
 export const UNCERTAIN_FIELDS = [
   "name", "business_name", "phones", "emails", "contact_type", "property_types", "size",
-  "budget", "desired_location", "follow_up_date", "source", "other",
+  "budget", "desired_location", "follow_up_date", "source", "address", "other",
 ] as const;
 
 // What Claude reads out of a broker's note. Claude only extracts; matching,
@@ -13,7 +13,9 @@ export const UNCERTAIN_FIELDS = [
 export const ExtractedPerson = z.object({
   name: z.string().nullable().describe("Person's name as written, or null if no person is named"),
   business_name: z.string().nullable(),
-  title: z.string().nullable(),
+  title: z.string().nullable().describe("Job title, e.g. from a business card"),
+  address: z.string().nullable()
+    .describe("The person's or business's street address as written, e.g. from a business card. Not where they want space"),
   phones: z.array(z.string()).describe("Phone numbers exactly as written"),
   emails: z.array(z.string()),
   contact_type: z.enum(CONTACT_TYPES).nullable()
@@ -42,12 +44,34 @@ export const ExtractedPerson = z.object({
   })).describe("Anything you could not read with confidence. Never guess a value; ask about it here instead"),
 });
 
+// Only when photos were sent: what they show, and whether they could be read.
+export const PhotoReport = z.object({
+  kind: z.enum(["business_card", "sign", "other"]),
+  unreadable: z.string().nullable()
+    .describe("When the photo can't be read well enough to use, a short reason for the broker (blurry, too dark, cut off). Null when it was read"),
+});
+
 export const Extraction = z.object({
   people: z.array(ExtractedPerson),
+  photo: PhotoReport.nullable().describe("Null when no photos were sent"),
+});
+
+// A saved extraction (development and the try-capture script), which may
+// predate photos and addresses.
+export const SavedExtraction = z.object({
+  people: z.array(ExtractedPerson.extend({ address: z.string().nullable().optional().transform((a) => a ?? null) })),
+  photo: PhotoReport.nullable().optional().transform((p) => p ?? null),
 });
 
 export type ExtractedPerson = z.infer<typeof ExtractedPerson>;
 export type Extraction = z.infer<typeof Extraction>;
+export type PhotoReport = z.infer<typeof PhotoReport>;
+
+// A photo as the phone sent it: already shrunk to a JPEG of about 1,600 pixels.
+export interface Photo {
+  data: string; // base64, no data: prefix
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+}
 
 const SYSTEM = `You read notes that commercial real estate brokers at Vantage write after meeting or talking with someone. Extract each person mentioned into the schema.
 
@@ -67,7 +91,14 @@ Notes are often dictated on a phone, so read spoken forms as what they mean:
 - Phone numbers said as words: "eight five six, five five five, oh one seven five" is 856-555-0175. "Oh" is zero. Write the digits. If a dictated number doesn't come to 10 digits (or 11 starting with 1), leave it out of phones and ask for it.
 - Emails said aloud: "linda at park medical dot com" is linda@parkmedical.com. If the spelling of any part is uncertain (a name heard by sound), leave it out of emails and ask the broker to type it.
 - Sizes and money said as words: "fifteen to twenty thousand square feet" is "15,000 to 20,000 sf"; "nine dollars a foot" is $9/sf (rent per square foot, so it goes in requirement_notes); "six hundred fifty thousand" is 650000.
-- Dictation can mishear names and words that sound alike. Don't correct a name to one you think is likelier; use it as written.`;
+- Dictation can mishear names and words that sound alike. Don't correct a name to one you think is likelier; use it as written.
+
+Photos may come with the note: a business card (one photo, or front and back), a sign, or another image. Read only what is printed.
+- A business card is one person: name, title, business_name, phones, emails, and address (the card's street address, never desired_location). Contact type, property types and source are not on a card; leave them empty and don't ask about them.
+- Never guess a character. If any digit of a phone number or any letter of an email can't be read with certainty, leave that value out and add a question to uncertain asking the broker to type it or send a clearer photo.
+- If the photo can't be read well enough to use at all, set photo.unreadable to a short reason and return no people.
+- Words the broker typed with the photo are a note about the same person.
+- Set photo.kind; set photo to null when no photo was sent.`;
 
 // Opus 5.5 is the default. Sonnet 5.5 and Haiku 5.5 are being compared for
 // speed and accuracy (see docs/build-plan.md).
@@ -79,6 +110,7 @@ export async function extractPeople(
   note: string,
   today: string,
   model: CaptureModel = "claude-opus-5-5",
+  photos: Photo[] = [],
 ): Promise<Extraction> {
   // Haiku has no server-side fallback; a declined note is simply reported.
   const fallback = model === "claude-haiku-5-5"
@@ -90,7 +122,14 @@ export async function extractPeople(
     ...fallback,
     output_config: { effort: "medium", format: betaZodOutputFormat(Extraction) },
     system: SYSTEM,
-    messages: [{ role: "user", content: `Today is ${today}.\n\nBroker's note:\n${note}` }],
+    messages: [{
+      role: "user",
+      content: [
+        // Sent inline with the request: nothing is stored on Anthropic's side.
+        ...photos.map((p) => ({ type: "image" as const, source: { type: "base64" as const, media_type: p.mediaType, data: p.data } })),
+        { type: "text" as const, text: `Today is ${today}.\n\n${photos.length ? `${photos.length === 2 ? "Two photos are" : "A photo is"} attached.\n\n` : ""}Broker's note:\n${note || "(no words, only the photo)"}` },
+      ],
+    }],
   });
 
   if (response.stop_reason === "refusal") {

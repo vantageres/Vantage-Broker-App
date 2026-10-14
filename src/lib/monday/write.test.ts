@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TEST_BOARDS } from "./boards";
 import type { MondayClient } from "./client";
-import { claimRecord, columnValue, saveProposal, SaveRefused } from "./write";
+import { checkPhotos, claimRecord, columnValue, saveProposal, SaveRefused } from "./write";
 
 const ME = { id: "1", name: "John Smyth" };
 
@@ -111,5 +111,49 @@ describe("claimRecord", () => {
   it("reports a claim lost in the moment between read and write", async () => {
     const { client } = fakeMonday([{}, { contactBroker: [2], names: "Emily Stein" }]);
     await expect(claimRecord(client, TEST_BOARDS.leads, "42", ME)).rejects.toMatchObject({ owner: "Emily Stein" });
+  });
+});
+
+describe("photos", () => {
+  const jpeg = { data: Buffer.from("not really a jpeg").toString("base64"), mediaType: "image/jpeg" as const };
+
+  function withUploads(failAt?: number) {
+    const fake = fakeMonday([{ contactBroker: [1], names: "John Smyth" }]);
+    const uploads: { item: string; column: string; name: string }[] = [];
+    fake.client.uploadFile = async (item, column, file) => {
+      if (uploads.length === failAt) throw new Error("upload failed");
+      uploads.push({ item, column, name: file.name });
+    };
+    return { ...fake, uploads };
+  }
+
+  it("attaches approved photos to Files, then adds the note", async () => {
+    const { client, mutations, uploads } = withUploads();
+    const result = await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "Added from a business card.", photos: [jpeg, jpeg] });
+    expect(uploads.map((u) => [u.item, u.column])).toEqual([["42", "file_mm82xcfx"], ["42", "file_mm82xcfx"]]);
+    expect(uploads[0].name).toMatch(/^photo-\d{4}-\d{2}-\d{2}-1\.jpg$/);
+    expect(result).toMatchObject({ photosAttached: 2, noteAdded: true });
+    expect(mutations.at(-1)?.query).toContain("create_timeline_item");
+  });
+
+  it("says how many photos made it when one fails, so a retry sends only the rest", async () => {
+    const { client, mutations } = withUploads(1);
+    const error = await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "size", value: "2,000 sf" }], noteText: "n", photos: [jpeg, jpeg] }).catch((e) => e);
+    expect(error.message).toBe("The changes were saved, but the photo wasn't attached.");
+    expect(error.result).toMatchObject({ fieldsChanged: 1, photosAttached: 1, noteAdded: false });
+    expect(mutations.some((m) => m.query.includes("create_timeline_item"))).toBe(false);
+  });
+
+  it("refuses more than two photos, odd types and very large files before saving anything", () => {
+    expect(() => checkPhotos([jpeg, jpeg, jpeg])).toThrow("at most 2");
+    expect(() => checkPhotos([{ data: "x", mediaType: "image/gif" }])).toThrow("couldn't be read");
+    expect(() => checkPhotos([{ data: "A".repeat(5_000_000), mediaType: "image/jpeg" }])).toThrow("too large");
+    expect(checkPhotos(undefined)).toEqual([]);
+  });
+
+  it("saves a card's address to Contact Address on Contacts only", () => {
+    const location = { lat: 39.89, lng: -75.03, address: "12 Main St, Haddonfield, NJ 08033, USA" };
+    expect(columnValue(TEST_BOARDS.contacts, { field: "contactAddress", value: "12 Main St", location })).toEqual(["location_mkqhcmz4", { lat: "39.89", lng: "-75.03", address: location.address }]);
+    expect(() => columnValue(TEST_BOARDS.leads, { field: "contactAddress", value: "12 Main St", location })).toThrow("Leads have no address field");
   });
 });

@@ -98,6 +98,7 @@ const LABELS: Record<string, string> = {
   email: "Email",
   contactBroker: "Contact Broker",
   status: "Status",
+  contactAddress: "Contact Address",
 };
 
 function ref(r: PersonRecord): RecordRef {
@@ -128,6 +129,8 @@ function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNot
   if (p.source) values.source = p.source;
   if (p.phones[0]) values.phone = p.phones[0];
   if (p.emails[0]) values.email = p.emails[0];
+  // Placed by proposalFor: Contact Address on Contacts, Notes on Leads.
+  if (p.address) values.contactAddress = p.address;
 
   const notes: string[] = [];
   if (p.requirement_notes) {
@@ -140,6 +143,10 @@ function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNot
         ? "Budget holds a single dollar amount, so rent per foot and price ranges go in Notes."
         : "No field holds these details, so they go in Notes.",
     });
+  }
+  if (p.title) {
+    notes.push(`Title: ${p.title}`);
+    placedInNotes.push({ text: p.title, why: "No field holds a job title, so it goes in Notes." });
   }
   const extras = p.extra_locations.filter((l) => !p.requirement_notes?.includes(l));
   if (extras.length) {
@@ -231,6 +238,16 @@ export function proposalFor(
   const questions = questionsFor(person, today);
   const subject = person.name ?? person.business_name ?? "Unnamed person";
   const base = { person, subject, noteText, placedInNotes, questions, automations: [] as string[] };
+
+  // Only Contacts have an address column; on a Lead (new or existing) the
+  // address goes in Notes.
+  if (values.contactAddress && (!record || !record.board.columns.contactAddress)) {
+    const address = values.contactAddress;
+    delete values.contactAddress;
+    const line = `Address: ${address}`;
+    values.notes = values.notes ? `${values.notes}. ${line}` : line;
+    placedInNotes.push({ text: address, why: "Leads have no address field, so the address goes in Notes." });
+  }
 
   if (!record) {
     const changes: FieldChange[] = [

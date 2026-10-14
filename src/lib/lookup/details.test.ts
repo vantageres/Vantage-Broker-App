@@ -7,7 +7,7 @@ import type { PersonRecord } from "../monday/records";
 const record: PersonRecord = {
   board: TEST_BOARDS.leads, id: "1", name: "Maria Chen", businessName: "Harbor Coffee Co.", updatedAt: "2026-10-13T00:00:00Z", url: "u",
   phones: [], emails: [], contactBrokerIds: [], coBrokerIds: [], contactBrokerNames: "John Smyth",
-  current: { contactType: "Leasee", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName: "", phone: "", email: "", status: "" },
+  current: { contactType: "Leasee", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName: "", phone: "", email: "", status: "", contactAddress: "" },
 };
 
 describe("lookupAnswer", () => {

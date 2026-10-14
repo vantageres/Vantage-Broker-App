@@ -39,7 +39,7 @@ function rec(key: "leads" | "contacts", id: string, name: string, businessName =
   return {
     board: TEST_BOARDS[key], id, name, businessName, updatedAt, url: "", phones: [], emails: [],
     contactBrokerIds: [], coBrokerIds: [], contactBrokerNames: "",
-    current: { contactType: "", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName, phone: "", email: "", status: "" },
+    current: { contactType: "", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName, phone: "", email: "", status: "", contactAddress: "" },
   };
 }
 

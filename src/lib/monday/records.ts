@@ -20,7 +20,7 @@ export interface PersonRecord {
 
 export type RequirementField =
   | "contactType" | "propertyType" | "budget" | "size" | "desiredLocation"
-  | "notes" | "followUp" | "source" | "businessName" | "phone" | "email" | "status";
+  | "notes" | "followUp" | "source" | "businessName" | "phone" | "email" | "status" | "contactAddress";
 
 interface RawColumn {
   id: string;
@@ -93,6 +93,7 @@ export function toPersonRecord(board: PersonBoard, item: RawItem, accountSlug: s
       phone: text(c.phone),
       email: text(c.email),
       status: text(c.status),
+      contactAddress: text(c.contactAddress),
     },
   };
 }

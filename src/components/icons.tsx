@@ -6,6 +6,8 @@ const svg = (size: number, children: React.ReactNode, width = 2) => (
   </svg>
 );
 export const History = ({ size = 22 }: P) => svg(size, <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></>);
+export const Camera = ({ size = 22 }: P) => svg(size, <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>);
+export const Close = ({ size = 14 }: P) => svg(size, <path d="M6 6l12 12M18 6L6 18" />, 2.4);
 export const Back = ({ size = 22 }: P) => svg(size, <path d="M15 6l-6 6 6 6" />, 2.4);
 export const Send = ({ size = 22 }: P) => svg(size, <path d="M12 19V5M5 12l7-7 7 7" />, 2.4);
 export const Pencil = ({ size = 16 }: P) => svg(size, <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></>);

@@ -5,6 +5,7 @@
 // only in the Broker App Test workspace.
 
 const API_URL = "https://api.monday.com/v2";
+const FILE_URL = "https://api.monday.com/v2/file";
 const API_VERSION = "2025-04";
 
 export class MondayError extends Error {
@@ -13,8 +14,16 @@ export class MondayError extends Error {
   }
 }
 
+export interface UploadFile {
+  name: string;
+  type: string;
+  data: Uint8Array<ArrayBuffer>;
+}
+
 export interface MondayClient {
   query<T>(query: string, variables?: Record<string, unknown>): Promise<T>;
+  // Adds a file to an item's file column (e.g. a business card photo).
+  uploadFile?(itemId: string, columnId: string, file: UploadFile): Promise<void>;
 }
 
 export const TEST_WORKSPACE_ID = "18004807";
@@ -58,11 +67,28 @@ export function testWorkspaceOnly(client: MondayClient): MondayClient {
       }
       return client.query<T>(query, variables);
     },
+    async uploadFile(itemId, columnId, file) {
+      if (!(await inTestWorkspace("item", itemId))) throw new MondayError("Development token: writes are allowed only in the Broker App Test workspace.");
+      return client.uploadFile!(itemId, columnId, file);
+    },
   };
 }
 
 function plainClient(token?: string): MondayClient {
+  const authHeaders = (): Record<string, string> => ({ "API-Version": API_VERSION, ...(token ? { Authorization: token } : {}) });
   return {
+    async uploadFile(itemId: string, columnId: string, file: UploadFile): Promise<void> {
+      if (!/^\d+$/.test(itemId) || !/^[a-z0-9_]+$/.test(columnId)) throw new MondayError("Not a Monday item or column.");
+      const form = new FormData();
+      form.append("query", `mutation ($file: File!) { add_file_to_column(item_id: ${itemId}, column_id: "${columnId}", file: $file) { id } }`);
+      form.append("variables[file]", new Blob([file.data], { type: file.type }), file.name);
+      const res = await fetch(FILE_URL, { method: "POST", headers: authHeaders(), body: form }).catch((error: unknown) => {
+        throw new MondayError(`Monday couldn't be reached (${error instanceof Error ? error.message : "network error"})`);
+      });
+      if (!res.ok) throw new MondayError(`Monday returned HTTP ${res.status} for the file`);
+      const body = (await res.json()) as { errors?: unknown[]; error_message?: string };
+      if (body.errors?.length || body.error_message) throw new MondayError("Monday rejected the file", body.errors ?? [{ message: body.error_message }]);
+    },
     async query<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",

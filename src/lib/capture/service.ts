@@ -5,7 +5,7 @@ import { TEST_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecords, type PersonRecord } from "../monday/records";
 import { IdleCache } from "../memory";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
-import { Extraction, extractPeople, type ExtractedPerson } from "./extract";
+import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal } from "./proposal";
 import { findMentioned } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
@@ -67,17 +67,38 @@ export interface Context {
 function devExtraction() {
   const file = process.env.DEV_EXTRACTION_FILE;
   if (!file || process.env.NODE_ENV === "production") return null;
-  return Extraction.parse(JSON.parse(readFileSync(file, "utf8")));
+  return SavedExtraction.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
-export async function capture(ctx: Context, note: string): Promise<Proposal[]> {
+export interface CaptureResult {
+  proposals: Proposal[];
+  photo: PhotoReport | null; // what the photos showed, when photos were sent
+}
+
+// The Broker Note for a photo is one short line, plus anything the broker typed.
+const PHOTO_NOTE: Record<PhotoReport["kind"], string> = {
+  business_card: "Added from a business card.",
+  sign: "Added from a sign photo.",
+  other: "Added from a photo.",
+};
+
+export function photoNoteText(note: string, photo: PhotoReport | null): string {
+  if (!photo) return note;
+  return [PHOTO_NOTE[photo.kind], note].filter(Boolean).join("\n\n");
+}
+
+export async function capture(ctx: Context, note: string, photos: Photo[] = []): Promise<CaptureResult> {
   const today = todayInNewJersey();
   const dev = devExtraction();
   const [extraction, records] = await Promise.all([
-    dev ? Promise.resolve(dev) : extractPeople(claude(), note, today),
+    dev ? Promise.resolve(dev) : extractPeople(claude(), note, today, undefined, photos),
     recordsFor(ctx.monday, ctx.sid, ctx.accountSlug),
   ]);
-  return Promise.all(extraction.people.map((p) => withMap(buildProposal(p, records, ctx.me, note, today))));
+  const photo = photos.length ? extraction.photo ?? { kind: "other" as const, unreadable: null } : null;
+  if (photo?.unreadable && extraction.people.length === 0) return { proposals: [], photo };
+  const noteText = photoNoteText(note, photo);
+  const proposals = await Promise.all(extraction.people.map((p) => withMap(buildProposal(p, records, ctx.me, noteText, today))));
+  return { proposals, photo };
 }
 
 // The broker picked a record, or chose "someone new".

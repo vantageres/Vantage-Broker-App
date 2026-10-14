@@ -13,7 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mondayClient } from "../src/lib/monday/client";
 import { TEST_BOARDS } from "../src/lib/monday/boards";
 import { loadPersonRecords } from "../src/lib/monday/records";
-import { CAPTURE_MODELS, extractPeople, Extraction, type CaptureModel } from "../src/lib/capture/extract";
+import { CAPTURE_MODELS, extractPeople, SavedExtraction, type CaptureModel } from "../src/lib/capture/extract";
 import { buildProposal, type Proposal } from "../src/lib/capture/proposal";
 import { googleGeocoder, resolveLocations } from "../src/lib/geocode";
 
@@ -49,7 +49,7 @@ const started = Date.now();
 const [{ me, account }, extraction] = await Promise.all([
   monday.query<{ me: { id: string; name: string }; account: { slug: string } }>("{ me { id name } account { slug } }"),
   extractionFile
-    ? Promise.resolve(Extraction.parse(JSON.parse(readFileSync(extractionFile, "utf8"))))
+    ? Promise.resolve(SavedExtraction.parse(JSON.parse(readFileSync(extractionFile, "utf8"))))
     : extractPeople(claude(), note, today, model),
 ]);
 const extractedAt = Date.now();

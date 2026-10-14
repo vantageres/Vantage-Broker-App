@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FieldChange, Proposal } from "@/lib/capture/proposal";
 import { CONTACT_TYPES, PROPERTY_TYPES, SOURCES } from "@/lib/monday/boards";
 import type { SaveChange, SaveField, SaveRequest, SaveResult } from "@/lib/monday/write";
+import type { ShrunkPhoto } from "@/lib/photo-client";
 import { Alert, Bolt, Check, Chevron, Lock, Note, Out, Pencil, Plus, UserPlus } from "./icons";
 
 type Point = { lat: number; lng: number; address: string };
@@ -17,11 +18,14 @@ type Status =
 
 const SAVE_FIELDS: SaveField[] = [
   "name", "businessName", "contactType", "propertyType", "budget", "size", "desiredLocation", "notes", "followUp", "source", "phone", "email",
+  "contactAddress",
 ];
+// Map columns: the value needs a place found on the map before it can be saved.
+const MAP_FIELDS = new Set(["desiredLocation", "contactAddress"]);
 const LABELS: Record<string, string> = {
   name: "Name", businessName: "Business Name", contactType: "Contact Type", propertyType: "Property Type", budget: "Budget",
   size: "Sq Ft/Acres", desiredLocation: "Desired Location", notes: "Notes", followUp: "Follow Up Date", source: "Source",
-  phone: "Phone", email: "Email",
+  phone: "Phone", email: "Email", contactAddress: "Contact Address",
 };
 
 // Dictation often mishears digits, spellings and amounts, so these proposed
@@ -50,7 +54,13 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return data;
 }
 
-export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onReplace: (p: Proposal) => void }) {
+export function ProposalCard({ proposal, photos = [], attachByDefault = true, onReplace }: {
+  proposal: Proposal;
+  photos?: ShrunkPhoto[]; // sent with the note; attached to the record's Files on approval
+  attachByDefault?: boolean;
+  onReplace: (p: Proposal) => void;
+}) {
+  const [attach, setAttach] = useState(attachByDefault && photos.length > 0);
   const [status, setStatus] = useState<Status>({ kind: "review" });
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -190,7 +200,8 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
     .filter((q) => q.field !== "match" && !answered.includes(q.i));
   const question = openQuestions[0];
   const totalQuestions = proposal.questions.filter((q) => q.field !== "match").length;
-  const missingMap = rowFields.includes("desiredLocation") && !valueOf("desiredLocation")?.location;
+  const missingMap = rowFields.some((f) => MAP_FIELDS.has(f) && !valueOf(f)?.location);
+  const attaching = attach ? photos.map(({ data, mediaType }) => ({ data, mediaType })) : [];
   const changeCount = rowFields.length + (notesAdded ? 1 : 0);
 
   function setEdit(field: string, edit: Edit) {
@@ -213,7 +224,7 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
     }
     if (notesAdded.trim()) changes.push({ field: "notes", value: notesKept ? `${notesKept.replace(/[.;\s]+$/, "")}. ${notesAdded.trim()}` : notesAdded.trim() });
     const target: SaveRequest["target"] = t.kind === "existing" ? { kind: "existing", board: t.record.board, id: t.record.id } : { kind: "new-lead" };
-    return { target, changes, noteText: proposal.noteText };
+    return { target, changes, noteText: proposal.noteText, photos: attaching };
   }
 
   async function save(request: SaveRequest) {
@@ -231,7 +242,13 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
     if (status.kind !== "failed") return;
     if (status.partial) {
       // Fields are already saved; only the note is retried.
-      save({ target: { kind: "existing", board: status.partial.board, id: status.partial.itemId }, changes: [], noteText: proposal.noteText });
+      // Only what's missing: photos not yet attached, then the note.
+      save({
+        target: { kind: "existing", board: status.partial.board, id: status.partial.itemId },
+        changes: [],
+        noteText: proposal.noteText,
+        photos: attaching.slice(status.partial.photosAttached),
+      });
     } else save(saveRequest());
   }
 
@@ -240,7 +257,7 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
 
   if (status.kind === "saved") {
     const r = status.result;
-    const parts = [r.fieldsChanged ? `${r.fieldsChanged} field${r.fieldsChanged === 1 ? "" : "s"} updated` : "", r.noteAdded ? "a note added" : ""].filter(Boolean);
+    const parts = [r.fieldsChanged ? `${r.fieldsChanged} field${r.fieldsChanged === 1 ? "" : "s"} updated` : "", r.photosAttached ? `${r.photosAttached === 1 ? "a photo" : `${r.photosAttached} photos`} attached` : "", r.noteAdded ? "a note added" : ""].filter(Boolean);
     return (
       <>
         <div className="card" style={{ padding: "12px 16px", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -253,7 +270,7 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
         <div className="bubble app saved-bubble" role="status">
           <span className="tick"><Check /></span>
           <div>
-            <div><strong>Saved to {r.name}.</strong> {parts.length ? `${parts.join(" and ")}.` : ""}</div>
+            <div><strong>Saved to {r.name}.</strong> {parts.length ? `${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.` : ""}</div>
             <a className="open" href={status.url} target="_blank" rel="noreferrer">Open in Monday <Out /></a>
           </div>
         </div>
@@ -293,8 +310,8 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
                         {c?.current && <span className="was">{c.currentDisplay ?? c.current}</span>}
                         <strong>{field === "followUp" ? showDate(v.value) : field === "budget" ? showMoney(v.value) : v.value}</strong>
                       </span>
-                      {field === "desiredLocation" && v.location && <span className="sub">On the map: {v.location.address}</span>}
-                      {field === "desiredLocation" && !v.location && <span className="warn">Not found on the map yet</span>}
+                      {MAP_FIELDS.has(field) && v.location && <span className="sub">On the map: {v.location.address}</span>}
+                      {MAP_FIELDS.has(field) && !v.location && <span className="warn">Not found on the map yet</span>}
                       {CHECK[field] && <span className="check">{CHECK[field]}</span>}
                     </span>
                     <span className="pencil"><Pencil /></span>
@@ -349,21 +366,31 @@ export function ProposalCard({ proposal, onReplace }: { proposal: Proposal; onRe
       {proposal.automations.map((a, i) => (
         <div className="callout auto" key={i}><Bolt /><span>{a}</span></div>
       ))}
-      <div className="note-line"><Note /> Full note added to Emails &amp; Activities</div>
+      {photos.length > 0 && (
+        <div className="attach-photos">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {photos.map((p, i) => <img key={i} src={p.preview} alt={i ? "Back" : "Front"} />)}
+          <label>
+            <input type="checkbox" checked={attach} disabled={working} onChange={(e) => setAttach(e.target.checked)} />
+            Attach {photos.length === 1 ? "the photo" : "both photos"} to Files
+          </label>
+        </div>
+      )}
+      <div className="note-line"><Note /> {photos.length ? "Note added to Emails & Activities" : <>Full note added to Emails &amp; Activities</>}</div>
 
       {status.kind === "failed" && (
         <div className="alert" role="alert" style={{ margin: "0 12px 12px" }}>
           <Alert />
           <div>
-            <strong>{status.partial ? "Changes saved. The note wasn't added." : "Not saved."}</strong>{" "}
-            {status.partial ? <>Retry adds only the note. <a href={status.url} target="_blank" rel="noreferrer">Open in Monday</a></> : status.message}
+            <strong>{status.partial ? `Changes saved. ${status.message.replace(/^The changes were saved, but /, "").replace(/^t/, "T")}` : "Not saved."}</strong>{" "}
+            {status.partial ? <>Retry adds only what&apos;s missing. <a href={status.url} target="_blank" rel="noreferrer">Open in Monday</a></> : status.message}
           </div>
         </div>
       )}
 
       <div className="card-foot">
         {status.kind === "failed" ? (
-          <button className="approve" onClick={retry}>{status.partial ? "Retry the note" : "Retry save"}</button>
+          <button className="approve" onClick={retry}>{status.partial ? "Retry" : "Retry save"}</button>
         ) : (
           <button className="approve" disabled={working || !!question || !!editing || missingMap} onClick={() => save(saveRequest())}>
             {working
@@ -391,7 +418,7 @@ function FieldEditor({ field, initial, onDone, onCancel }: { field: string; init
   async function done() {
     const v = value.trim();
     if (!v) return setMsg("Enter a value, or Cancel to keep it.");
-    if (field === "desiredLocation") {
+    if (MAP_FIELDS.has(field)) {
       if (initial.location && v === initial.value) return onDone(initial);
       setBusy(true);
       const found = await findOnMap(v);
@@ -481,7 +508,7 @@ function Question({ number, total, field, text, initial = "", onAnswer, onSkip }
   async function submit() {
     const v = value.trim();
     if (!v) return setMsg("Enter an answer, or skip to leave it empty.");
-    if (field === "desiredLocation") {
+    if (MAP_FIELDS.has(field)) {
       setBusy(true);
       const found = await findOnMap(v);
       setBusy(false);

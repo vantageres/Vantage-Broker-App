@@ -27,6 +27,8 @@ export interface PersonBoard {
     email: string;
     source: string;
     status?: string;
+    contactAddress?: string; // Contacts only: a map column
+    files: string;
   };
   // Label used when Contact Type has no value.
   contactTypeUnset: string;
@@ -54,6 +56,7 @@ export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
       email: "email",
       source: "label7",
       status: "color_mkpme1c1",
+      files: "file_mm82xcfx",
     },
     contactTypeUnset: "Not Set",
     propertyLinks: ["board_relation_mkr7eesb"],
@@ -76,6 +79,8 @@ export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
       phone: "phone",
       email: "email",
       source: "label7",
+      contactAddress: "location_mkqhcmz4",
+      files: "file_mm82c8v0",
     },
     contactTypeUnset: "Not Labeled",
     propertyLinks: ["connect_boards7", "board_relation_mm839kb1"],

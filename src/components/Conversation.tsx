@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { shrinkPhoto, type ShrunkPhoto } from "@/lib/photo-client";
+import type { PhotoReport } from "@/lib/capture/extract";
 import type { Proposal } from "@/lib/capture/proposal";
 import type { LookupResult } from "@/lib/capture/service";
 import type { LookupAnswer } from "@/lib/lookup/details";
@@ -14,13 +16,13 @@ import { LookupCard } from "./LookupCard";
 import { PropertyCard } from "./PropertyCard";
 import { PropertyLeadCard } from "./PropertyLeadCard";
 import { SummaryCard } from "./SummaryCard";
-import { Out, Send } from "./icons";
+import { Camera, Close, Out, Send } from "./icons";
 
 type Entry =
-  | { id: number; kind: "me"; text: string }
-  | { id: number; kind: "app"; text: string; retry?: string; asNote?: string; more?: Listed[] }
+  | { id: number; kind: "me"; text: string; photos?: ShrunkPhoto[] }
+  | { id: number; kind: "app"; text: string; retry?: string; retryPhotos?: ShrunkPhoto[]; asNote?: string; more?: Listed[] }
   | { id: number; kind: "pending"; text: string }
-  | { id: number; kind: "proposal"; proposal: Proposal }
+  | { id: number; kind: "proposal"; proposal: Proposal; photos?: ShrunkPhoto[]; attachByDefault?: boolean }
   | { id: number; kind: "answer"; answer: LookupAnswer }
   | { id: number; kind: "property"; hit: PropertyHit }
   | { id: number; kind: "lead"; lead: PropertyLeadView }
@@ -38,6 +40,10 @@ export function Conversation({ firstName }: { firstName: string }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  // Photos waiting to be sent: a business card's front, and optionally its back.
+  const [photos, setPhotos] = useState<ShrunkPhoto[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   // On a phone, the keyboard's microphone is how to talk instead of type.
   const [onPhone, setOnPhone] = useState(false);
   useEffect(() => {
@@ -52,42 +58,67 @@ export function Conversation({ firstName }: { firstName: string }) {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [entries]);
 
-  async function send(note: string, echo = true, mode: Mode = "auto") {
-    if (!note.trim() || busy) return;
-    const asking = mode === "auto" && isQuestion(note);
+  async function addPhotos(files: FileList | null) {
+    setPhotoError(null);
+    const chosen = [...(files ?? [])].slice(0, 2 - photos.length);
+    try {
+      const shrunk = await Promise.all(chosen.map(shrinkPhoto));
+      setPhotos((p) => [...p, ...shrunk].slice(0, 2));
+    } catch (err) {
+      setPhotoError((err as Error).message);
+    }
+    if (picker.current) picker.current.value = "";
+  }
+
+  async function send(note: string, echo = true, mode: Mode = "auto", withPhotos: ShrunkPhoto[] = []) {
+    if ((!note.trim() && !withPhotos.length) || busy) return;
+    // A message with a photo is always read as a note, never as a question.
+    const asking = mode === "auto" && !withPhotos.length && isQuestion(note);
     setBusy(true);
     const pendingId = nextId++;
     setEntries((e) => [
       ...e,
-      ...(echo ? [{ id: nextId++, kind: "me" as const, text: note }] : []),
-      { id: pendingId, kind: "pending", text: asking ? "Looking in Monday…" : "Reading your note…" },
+      ...(echo ? [{ id: nextId++, kind: "me" as const, text: note, photos: withPhotos.length ? withPhotos : undefined }] : []),
+      { id: pendingId, kind: "pending", text: asking ? "Looking in Monday…" : withPhotos.length ? "Reading the photo…" : "Reading your note…" },
     ]);
     setText("");
+    setPhotos([]);
     if (asking) {
       await ask(note, pendingId);
       setBusy(false);
       return;
     }
     try {
-      const res = await fetch("/api/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
-      const data = (await res.json().catch(() => ({}))) as { proposals?: Proposal[]; error?: string };
+      const res = await fetch("/api/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note, photos: withPhotos.map(({ data, mediaType }) => ({ data, mediaType })) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { proposals?: Proposal[]; photo?: PhotoReport | null; error?: string };
       if (res.status === 401) {
         window.location.href = "/signin";
         return;
       }
       if (!res.ok || !data.proposals) throw new Error(data.error ?? "Something went wrong.");
       const proposals = data.proposals;
+      const unreadable = data.photo?.unreadable;
       setEntries((e) => [
         ...e.filter((x) => x.id !== pendingId),
         proposals.length
           ? { id: nextId++, kind: "app", text: proposals.length > 1 ? `${proposals.length} people in this note. Each has its own changes.` : "Here's what I'll save. Tap a value to change it." }
-          : { id: nextId++, kind: "app", text: "I didn't find a person in that note, so there's nothing to save." },
-        ...proposals.map((proposal) => ({ id: nextId++, kind: "proposal" as const, proposal })),
+          : unreadable
+            ? { id: nextId++, kind: "app", text: `I couldn't read the photo clearly (${unreadable}). Try again in good light, with the card flat and filling the frame. Nothing was saved.` }
+            : { id: nextId++, kind: "app", text: withPhotos.length ? "I didn't find a person in that photo, so there's nothing to save." : "I didn't find a person in that note, so there's nothing to save." },
+        // The photos go with each proposal, to attach to Files on approval.
+        ...proposals.map((proposal) => ({
+          id: nextId++, kind: "proposal" as const, proposal,
+          photos: withPhotos.length ? withPhotos : undefined, attachByDefault: proposals.length === 1,
+        })),
       ]);
     } catch (err) {
       setEntries((e) => [
         ...e.filter((x) => x.id !== pendingId),
-        { id: nextId++, kind: "app", text: `${(err as Error).message} Nothing was saved.`, retry: note },
+        { id: nextId++, kind: "app", text: `${(err as Error).message} Nothing was saved.`, retry: note, retryPhotos: withPhotos.length ? withPhotos : undefined },
       ]);
     } finally {
       setBusy(false);
@@ -156,7 +187,8 @@ export function Conversation({ firstName }: { firstName: string }) {
   }
 
   function replace(id: number, proposal: Proposal) {
-    setEntries((e) => e.map((x) => (x.id === id ? { id: nextId++, kind: "proposal", proposal } : x)));
+    // A picked match keeps the photos that came with the note.
+    setEntries((e) => e.map((x) => (x.id === id && x.kind === "proposal" ? { ...x, id: nextId++, proposal } : x)));
   }
 
   return (
@@ -170,7 +202,17 @@ export function Conversation({ firstName }: { firstName: string }) {
         {entries.map((entry) => {
           switch (entry.kind) {
             case "me":
-              return <div key={entry.id} className="bubble me">{entry.text}</div>;
+              return (
+                <div key={entry.id} className="bubble me">
+                  {entry.photos && (
+                    <span className="bubble-photos">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {entry.photos.map((p, i) => <img key={i} src={p.preview} alt={i ? "Back of the photo" : "Photo"} />)}
+                    </span>
+                  )}
+                  {entry.text}
+                </div>
+              );
             case "pending":
               return <div key={entry.id} className="bubble app pending">{entry.text}</div>;
             case "app":
@@ -185,7 +227,7 @@ export function Conversation({ firstName }: { firstName: string }) {
                     </ul>
                   )}
                   {entry.retry && (
-                    <div><button className="small-btn" style={{ marginTop: 8 }} onClick={() => send(entry.retry!, false)}>Try again</button></div>
+                    <div><button className="small-btn" style={{ marginTop: 8 }} onClick={() => send(entry.retry!, false, "auto", entry.retryPhotos)}>Try again</button></div>
                   )}
                   {entry.asNote && (
                     <div><button className="link-btn" disabled={busy} onClick={() => send(entry.asNote!, false, "note")}>Read it as a note instead</button></div>
@@ -201,29 +243,47 @@ export function Conversation({ firstName }: { firstName: string }) {
             case "summary":
               return <SummaryCard key={entry.id} points={entry.points} recordsRead={entry.recordsRead} />;
             case "proposal":
-              return <ProposalCard key={entry.id} proposal={entry.proposal} onReplace={(p) => replace(entry.id, p)} />;
+              return <ProposalCard key={entry.id} proposal={entry.proposal} photos={entry.photos} attachByDefault={entry.attachByDefault} onReplace={(p) => replace(entry.id, p)} />;
           }
         })}
         <div ref={end} />
       </main>
       <div className="composer-wrap">
-        <form className="composer" onSubmit={(e) => { e.preventDefault(); send(text); }}>
+        {(photos.length > 0 || photoError) && (
+          <div className="photo-tray">
+            {photos.map((p, i) => (
+              <span className="photo-thumb" key={i}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.preview} alt={i ? "Back" : "Front"} />
+                <button type="button" aria-label={`Remove the ${i ? "back" : "front"}`} onClick={() => setPhotos((all) => all.filter((_, j) => j !== i))}><Close /></button>
+              </span>
+            ))}
+            {photos.length === 1 && (
+              <button type="button" className="link-btn" onClick={() => picker.current?.click()}>Add the back (optional)</button>
+            )}
+            {photoError && <p className="inline-msg bad" role="alert">{photoError}</p>}
+          </div>
+        )}
+        <form className="composer" onSubmit={(e) => { e.preventDefault(); send(text, true, "auto", photos); }}>
+          {/* The phone offers Take Photo or Photo Library; a computer opens a file picker. */}
+          <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
+          <button className="round-btn camera" type="button" aria-label="Add a photo" disabled={busy || photos.length >= 2} onClick={() => picker.current?.click()}><Camera /></button>
           <label>
             <span className="sr-only">Message</span>
             <textarea
               rows={1}
               value={text}
-              placeholder="Notes or a question…"
+              placeholder={photos.length ? "Add a note (optional)…" : "Notes or a question…"}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(min-width: 900px)").matches) {
                   e.preventDefault();
-                  send(text);
+                  send(text, true, "auto", photos);
                 }
               }}
             />
           </label>
-          <button className="round-btn send" type="submit" aria-label="Send" disabled={!text.trim() || busy}><Send /></button>
+          <button className="round-btn send" type="submit" aria-label="Send" disabled={(!text.trim() && !photos.length) || busy}><Send /></button>
         </form>
         <p className="composer-hint">Enter to send · Shift + Enter for a new line</p>
       </div>

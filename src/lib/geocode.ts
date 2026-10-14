@@ -49,11 +49,20 @@ export function googleGeocoder(apiKey: string, fetchImpl: typeof fetch = fetch):
   };
 }
 
-// Attach a map point to the proposed Desired Location. If the place can't be
-// found, or Google only matched part of it, the field is left out and the
-// broker is asked instead of saving a guess.
+// The map columns: Desired Location, and Contact Address on Contacts.
+const MAP_FIELDS = ["desiredLocation", "contactAddress"] as const;
+
+// Attach a map point to each proposed map value. If a place can't be found,
+// or Google only matched part of it, the field is left out and the broker is
+// asked instead of saving a guess.
 export async function resolveLocations(proposal: Proposal, geocode: Geocoder): Promise<Proposal> {
-  const change = proposal.changes.find((c) => c.field === "desiredLocation");
+  let resolved = proposal;
+  for (const field of MAP_FIELDS) resolved = await resolveOne(resolved, field, geocode);
+  return resolved;
+}
+
+async function resolveOne(proposal: Proposal, field: (typeof MAP_FIELDS)[number], geocode: Geocoder): Promise<Proposal> {
+  const change = proposal.changes.find((c) => c.field === field);
   if (!change) return proposal;
   const point = await geocode(change.proposed);
   if (point && !point.partial) {
@@ -66,6 +75,6 @@ export async function resolveLocations(proposal: Proposal, geocode: Geocoder): P
   return {
     ...proposal,
     changes: proposal.changes.filter((c) => c !== change),
-    questions: [...proposal.questions, { field: "desiredLocation", question }],
+    questions: [...proposal.questions, { field, question }],
   };
 }

@@ -6,7 +6,7 @@ import type { PersonRecord } from "../monday/records";
 const record = (id: string, name: string, current: Partial<PersonRecord["current"]> = {}): PersonRecord => ({
   board: TEST_BOARDS.leads, id, name, businessName: "", updatedAt: "2026-10-12T15:00:00Z", url: `u${id}`,
   phones: ["8565550101"], emails: ["a@b.example"], contactBrokerIds: [], coBrokerIds: [], contactBrokerNames: "John Smyth",
-  current: { contactType: "", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName: "", phone: "8565550101", email: "a@b.example", status: "", ...current },
+  current: { contactType: "", propertyType: "", budget: "", size: "", desiredLocation: "", notes: "", followUp: "", source: "", businessName: "", phone: "8565550101", email: "a@b.example", status: "", contactAddress: "", ...current },
 });
 
 const refs = new Map([["R1", record("1", "Ray Fulton")], ["R2", record("2", "Grace Kim")]]);

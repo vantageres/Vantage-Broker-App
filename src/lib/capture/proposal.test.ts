@@ -21,7 +21,7 @@ function record(overrides: Partial<PersonRecord> & { name: string }): PersonReco
     contactBrokerNames: ME.name,
     current: {
       contactType: "", propertyType: "", budget: "", size: "", desiredLocation: "",
-      notes: "", followUp: "", source: "", businessName: "", phone: "", email: "", status: "",
+      notes: "", followUp: "", source: "", businessName: "", phone: "", email: "", status: "", contactAddress: "",
     },
     ...overrides,
   };
@@ -29,7 +29,7 @@ function record(overrides: Partial<PersonRecord> & { name: string }): PersonReco
 
 function person(overrides: Partial<ExtractedPerson>): ExtractedPerson {
   return {
-    name: null, business_name: null, title: null, phones: [], emails: [],
+    name: null, business_name: null, title: null, address: null, phones: [], emails: [],
     contact_type: null, property_types: [], size: null, budget: null,
     desired_location: null, extra_locations: [], follow_up_phrase: null,
     follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false,
@@ -224,5 +224,31 @@ describe("buildProposal", () => {
     const p = buildProposal(person({ name: "Kevin", emails: ["kevin.obrien@mail.example"] }), [existing], ME, "note", TODAY);
     expect(p.target.kind).toBe("existing");
     expect(p.changes.find((c) => c.field === "email")).toBeUndefined();
+  });
+});
+
+describe("a business card", () => {
+  const card = person({
+    name: "Pat Testwell", business_name: "Testwell Dental", title: "Practice Manager",
+    phones: ["856-555-0199"], emails: ["pat@testwell.example"], address: "12 Main St, Haddonfield, NJ 08033",
+  });
+
+  it("puts the title in Notes, and the address in Notes on a new Lead", () => {
+    const p = buildProposal(card, [], ME, "Added from a business card.", TODAY);
+    expect(p.target.kind).toBe("new-lead");
+    expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("Title: Practice Manager. Address: 12 Main St, Haddonfield, NJ 08033");
+    expect(p.changes.find((c) => c.field === "contactAddress")).toBeUndefined();
+    expect(p.placedInNotes.map((n) => n.why)).toEqual([
+      "No field holds a job title, so it goes in Notes.",
+      "Leads have no address field, so the address goes in Notes.",
+    ]);
+  });
+
+  it("puts the address in Contact Address on a Contact", () => {
+    const contact = record({ name: "Pat Testwell", board: TEST_BOARDS.contacts, phones: ["8565550199"] });
+    const p = buildProposal(card, [contact], ME, "Added from a business card.", TODAY);
+    expect(p.target.kind).toBe("existing");
+    expect(p.changes.find((c) => c.field === "contactAddress")).toMatchObject({ label: "Contact Address", proposed: "12 Main St, Haddonfield, NJ 08033" });
+    expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("Title: Practice Manager");
   });
 });
