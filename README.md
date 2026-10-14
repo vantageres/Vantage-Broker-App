@@ -14,7 +14,7 @@ Settings, in `.env.local` for development or the host's settings in production:
 | Variable | What it is |
 | --- | --- |
 | `SESSION_SECRET` | At least 32 random characters. Encrypts the sign-in cookie. |
-| `MONDAY_CLIENT_ID`, `MONDAY_CLIENT_SECRET` | The Monday OAuth app brokers sign in with. Its "New OAuth Flow" (OAuth 2.1 with PKCE) must be on. |
+| `MONDAY_CLIENT_ID`, `MONDAY_CLIENT_SECRET` | The Monday OAuth app brokers sign in with. Its "New OAuth Flow" (OAuth 2.1 with PKCE) must be on. Scopes: `me:read`, `boards:read`, `boards:write`, `updates:read` (notes in lookups). |
 | `APP_URL` | The app's address, e.g. `https://broker.vantageres.com`. The Monday app's redirect URL is `APP_URL/api/auth/callback`. |
 | `BROKER_APP_ANTHROPIC_KEY` | Vantage's Claude API key. |
 | `GOOGLE_MAPS_API_KEY` | Google Maps Geocoding key, for Desired Location. |
