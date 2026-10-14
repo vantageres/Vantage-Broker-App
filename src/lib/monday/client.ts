@@ -35,3 +35,14 @@ export function mondayClient(token?: string): MondayClient {
     },
   };
 }
+
+// A short, safe reason for the screen: Monday's own message, never anything
+// that mentions a token.
+export function mondayReason(error: unknown): string {
+  if (!(error instanceof Error)) return "unknown error";
+  const details = error instanceof MondayError && Array.isArray(error.details)
+    ? (error.details as { message?: string }[]).map((d) => d.message).filter(Boolean).join("; ")
+    : "";
+  const reason = details || error.message;
+  return /token/i.test(reason) ? error.message : reason.slice(0, 200);
+}

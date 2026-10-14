@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { lookup } from "@/lib/capture/service";
 import { fail, withBroker } from "@/lib/api";
+import { mondayReason } from "@/lib/monday/client";
 
 // Read only: lookups never change Monday, so they need no approval.
 export async function POST(req: Request) {
@@ -10,8 +11,9 @@ export async function POST(req: Request) {
     try {
       return NextResponse.json(await lookup(ctx, question.trim()));
     } catch (error) {
-      console.error(`[lookup] ${error instanceof Error ? error.message : "failed"}`);
-      return fail(new Error("Monday didn't respond, so I couldn't look that up. Try again in a moment."));
+      const reason = mondayReason(error);
+      console.error(`[lookup] ${reason}`);
+      return fail(new Error(`Monday didn't answer the lookup, so I couldn't look that up. (${reason})`));
     }
   });
 }

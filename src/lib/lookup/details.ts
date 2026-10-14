@@ -1,4 +1,4 @@
-import type { MondayClient } from "../monday/client";
+import { mondayReason, type MondayClient } from "../monday/client";
 import type { PersonRecord } from "../monday/records";
 import { formatDate } from "../capture/proposal";
 
@@ -22,27 +22,30 @@ export interface LookupAnswer {
   coBrokers: string;
   fields: { label: string; value: string }[];
   notes: LookupNote[];
+  notesIncomplete: boolean; // Monday refused updates or the timeline
+  propertiesUnknown: boolean;
+  problems: string[];
   properties: { name: string; url: string }[];
 }
 
-const DETAIL_QUERY = `
-  query ($ids: [ID!], $item: ID!, $columns: [String!]) {
+// Three separate reads, so one Monday refusal (for example a missing
+// updates:read permission) doesn't hide the rest of the record.
+const LINKS_QUERY = `
+  query ($ids: [ID!], $columns: [String!]) {
     items(ids: $ids) {
-      updates(limit: 5) { text_body created_at creator { name } }
       column_values(ids: $columns) { id text ... on BoardRelationValue { linked_items { id name board { id } } } }
     }
-    timeline(id: $item) {
-      timeline_items_page(limit: 10) { timeline_items { title content created_at user { name } } }
-    }
+  }`;
+const UPDATES_QUERY = `
+  query ($ids: [ID!]) { items(ids: $ids) { updates(limit: 5) { text_body created_at creator { name } } } }`;
+const TIMELINE_QUERY = `
+  query ($item: ID!) {
+    timeline(id: $item) { timeline_items_page(limit: 10) { timeline_items { title content created_at user { name } } } }
   }`;
 
-type Detail = {
-  items: {
-    updates: { text_body: string | null; created_at: string; creator: { name: string } | null }[];
-    column_values: { id: string; text: string | null; linked_items?: { id: string; name: string; board: { id: string } }[] }[];
-  }[];
-  timeline: { timeline_items_page: { timeline_items: { title: string | null; content: string | null; created_at: string; user: { name: string } | null }[] } } | null;
-};
+type Links = { items: { column_values: { id: string; text: string | null; linked_items?: { id: string; name: string; board: { id: string } }[] }[] }[] };
+type Updates = { items: { updates: { text_body: string | null; created_at: string; creator: { name: string } | null }[] }[] };
+type Timeline = { timeline: { timeline_items_page: { timeline_items: { title: string | null; content: string | null; created_at: string; user: { name: string } | null }[] } } | null };
 
 const LATEST_NOTES = 3;
 
@@ -56,19 +59,29 @@ const stripHtml = (s: string) => s.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+
 
 export async function lookupAnswer(monday: MondayClient, record: PersonRecord, accountSlug: string): Promise<LookupAnswer> {
   const links = record.board.propertyLinks;
-  const data = await monday.query<Detail>(DETAIL_QUERY, {
-    ids: [record.id],
-    item: record.id,
-    columns: [record.board.columns.coBrokers, ...links],
-  });
-  const item = data.items[0];
-  const col = (id: string) => item?.column_values.find((c) => c.id === id);
+  const [linkRes, updateRes, timelineRes] = await Promise.allSettled([
+    monday.query<Links>(LINKS_QUERY, { ids: [record.id], columns: [record.board.columns.coBrokers, ...links] }),
+    monday.query<Updates>(UPDATES_QUERY, { ids: [record.id] }),
+    monday.query<Timeline>(TIMELINE_QUERY, { item: record.id }),
+  ]);
+  const problems: string[] = [];
+  const got = <T,>(r: PromiseSettledResult<T>, what: string): T | null => {
+    if (r.status === "fulfilled") return r.value;
+    const reason = mondayReason(r.reason);
+    console.error(`[lookup] ${what} for item ${record.id}: ${reason}`);
+    problems.push(`${what}: ${reason}`);
+    return null;
+  };
+  const linkData = got(linkRes, "links");
+  const updates = got(updateRes, "updates");
+  const timeline = got(timelineRes, "timeline");
+  const col = (id: string) => linkData?.items[0]?.column_values.find((c) => c.id === id);
 
   const notes: LookupNote[] = [
-    ...(data.timeline?.timeline_items_page.timeline_items ?? [])
+    ...(timeline?.timeline?.timeline_items_page.timeline_items ?? [])
       .filter((t) => t.content?.trim())
       .map((t) => ({ at: t.created_at, by: t.user?.name ?? "", text: stripHtml(t.content ?? ""), kind: t.title ?? "Note" })),
-    ...(item?.updates ?? [])
+    ...(updates?.items[0]?.updates ?? [])
       .filter((u) => u.text_body?.trim())
       .map((u) => ({ at: u.created_at, by: u.creator?.name ?? "", text: u.text_body!.trim(), kind: "Update" })),
   ]
@@ -108,6 +121,9 @@ export async function lookupAnswer(monday: MondayClient, record: PersonRecord, a
     coBrokers: col(record.board.columns.coBrokers)?.text ?? "",
     fields,
     notes,
+    notesIncomplete: !updates || !timeline,
     properties,
+    propertiesUnknown: !linkData,
+    problems,
   };
 }

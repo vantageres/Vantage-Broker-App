@@ -27,8 +27,11 @@ export function LookupCard({ answer }: { answer: LookupAnswer }) {
       </div>
       <section className="lookup-section">
         <h3>Latest notes</h3>
+        {answer.notesIncomplete && (
+          <p className="inline-msg bad">Some notes couldn&apos;t be read from Monday, so this list may be missing some. ({answer.problems.join("; ")})</p>
+        )}
         {answer.notes.length === 0 ? (
-          <p className="inline-msg">No notes in Monday yet.</p>
+          !answer.notesIncomplete && <p className="inline-msg">No notes in Monday yet.</p>
         ) : (
           <ul className="lookup-notes">
             {answer.notes.map((n, i) => (
@@ -40,6 +43,9 @@ export function LookupCard({ answer }: { answer: LookupAnswer }) {
           </ul>
         )}
       </section>
+      {answer.propertiesUnknown && (
+        <section className="lookup-section"><p className="inline-msg bad">Linked properties couldn&apos;t be read from Monday.</p></section>
+      )}
       {answer.properties.length > 0 && (
         <section className="lookup-section">
           <h3>Linked properties</h3>
