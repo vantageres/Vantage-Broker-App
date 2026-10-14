@@ -27,6 +27,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
   - drive it with Playwright using `executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"`
 - `.env.local` is gitignored. A new session needs `SESSION_SECRET` (any 32+ characters), `MONDAY_DEV_PROXY_AUTH=1`, and optionally `DEV_EXTRACTION_FILE` (a saved extraction JSON used instead of calling Claude).
 - The Claude key is not in this environment, so local capture uses the saved extraction.
+- A session on John's Windows PC (`C:\Claude Projects\Vantage Broker App`) has no network secret, so it cannot reach the test boards as a signed-in broker. It can build, test, and run signed-out screens. Use Git Bash for `npm run dev` (the script sets variables the POSIX way).
 
 ## Rules to keep
 
@@ -39,7 +40,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 ## Next work, in order
 
 1. **Confirm notes in lookups** after John signs in again with `updates:read`.
-2. **Service worker** for the installed app (an offline shell only; capture stays online only).
+2. **Service worker** for the installed app. Built Oct 14 (`public/sw.js`, offline page `public/offline.html`). Tried locally with `next build && next start`: it registers, caches only the shell files, and shows the offline page when the server is down. John to check on a phone: install, turn on airplane mode, open the app.
 3. **Model comparison:** Opus 5.5 at medium and low effort, Sonnet 5.5, Haiku 5.5, with 3+ runs per test note. It must run where `BROKER_APP_ANTHROPIC_KEY` is available.
 4. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.

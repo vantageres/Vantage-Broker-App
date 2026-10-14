@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>Broker Assistant</title>
+  <link rel="icon" href="/icon-192.png">
+  <style>
+    /* Shown by the service worker when the network can't be reached. Self-contained, matching globals.css. */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { background: #f4f5f8; color: #18233a; font-family: "Manrope", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+    main { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; }
+    img { height: 56px; width: auto; }
+    h1 { margin: 0; font-size: 20px; font-weight: 800; }
+    p { margin: 0; color: #5a6478; max-width: 320px; line-height: 1.5; }
+    button { font: inherit; width: 100%; max-width: 320px; height: 56px; border: 0; border-radius: 16px; background: #d2461a; color: #fff; font-size: 18px; font-weight: 800; cursor: pointer; }
+    @media (min-width: 900px) { button { height: 44px; border-radius: 12px; font-size: 15px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/vantage-logo.png" alt="Vantage Commercial">
+    <h1>You're offline</h1>
+    <p>The Broker Assistant needs a connection to read and save to Monday. No Monday records are kept on this device.</p>
+    <p>It will open again as soon as you're back online.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+  <script>addEventListener("online", () => location.reload());</script>
+</body>
+</html>
