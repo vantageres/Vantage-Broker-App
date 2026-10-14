@@ -185,7 +185,7 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .signin .approve { width: 100%; max-width: 320px; text-decoration: none; display: flex; align-items: center; justify-content: center; }
 .signin .secondary { width: 100%; max-width: 320px; }
 .signin .text-link { background: none; border: 0; padding: 8px; color: var(--navy); font-size: 15px; font-weight: 700; text-decoration: underline; cursor: pointer; }
-.signin .link-btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.signin .signin-btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .signin .link-shown { font-size: 34px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .signin .link-form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
 .signin .link-code {

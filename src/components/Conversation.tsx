@@ -6,11 +6,13 @@ import type { LookupResult } from "@/lib/capture/service";
 import type { LookupAnswer } from "@/lib/lookup/details";
 import type { SummaryPoint } from "@/lib/lookup/summary";
 import type { PropertyHit } from "@/lib/property/search";
+import type { PropertyLeadView } from "@/lib/property-leads/board";
 import { isQuestion } from "@/lib/lookup/question";
 import { propertyIntro } from "@/lib/property/intro";
 import { ProposalCard } from "./ProposalCard";
 import { LookupCard } from "./LookupCard";
 import { PropertyCard } from "./PropertyCard";
+import { PropertyLeadCard } from "./PropertyLeadCard";
 import { SummaryCard } from "./SummaryCard";
 import { Out, Send } from "./icons";
 
@@ -21,6 +23,7 @@ type Entry =
   | { id: number; kind: "proposal"; proposal: Proposal }
   | { id: number; kind: "answer"; answer: LookupAnswer }
   | { id: number; kind: "property"; hit: PropertyHit }
+  | { id: number; kind: "lead"; lead: PropertyLeadView }
   | { id: number; kind: "summary"; points: SummaryPoint[]; recordsRead: number };
 
 type Listed = { name: string; url: string; boardLabel: string };
@@ -119,6 +122,14 @@ export function Conversation({ firstName }: { firstName: string }) {
         return;
       }
 
+      if (result.kind === "propertyLeads") {
+        done(
+          { id: nextId++, kind: "app", text: result.leads.length === 1 ? "Here's the Property Lead. Its brokers can tap a value to change it." : `${result.leads.length} Property Leads match.`, asNote: question },
+          ...result.leads.map((lead) => ({ id: nextId++, kind: "lead" as const, lead })),
+        );
+        return;
+      }
+
       const { answers, more, partial } = result;
       const total = answers.length + more.length;
       if (total === 0) {
@@ -177,6 +188,8 @@ export function Conversation({ firstName }: { firstName: string }) {
               return <LookupCard key={entry.id} answer={entry.answer} />;
             case "property":
               return <PropertyCard key={entry.id} hit={entry.hit} />;
+            case "lead":
+              return <PropertyLeadCard key={entry.id} lead={entry.lead} />;
             case "summary":
               return <SummaryCard key={entry.id} points={entry.points} recordsRead={entry.recordsRead} />;
             case "proposal":

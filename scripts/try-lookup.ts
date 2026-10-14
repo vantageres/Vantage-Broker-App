@@ -35,6 +35,14 @@ if (result.kind === "properties") {
 } else if (result.kind === "summary") {
   console.log(`Summary from ${result.recordsRead} records (${ms} ms)`);
   for (const p of result.points) console.log(`- ${p.text} [${p.sources.map((s) => s.name).join(", ")}]`);
+} else if (result.kind === "propertyLeads") {
+  console.log(`Property Leads: ${result.leads.length} (${ms} ms)`);
+  for (const l of result.leads) {
+    console.log(`
+${l.name} · Broker ${l.brokers.broker || "none"} · ${l.canEdit ? "you can edit" : "read only"}`);
+    for (const [k, v] of Object.entries(l.values)) if (v) console.log(`  ${k}: ${v}`);
+    if (l.contacts.length) console.log(`  linked: ${l.contacts.map((c) => c.name).join(", ")}`);
+  }
 } else {
   console.log(`Records: ${result.answers.length + result.more.length}${result.partial ? " (partly match)" : ""} (${ms} ms)`);
   for (const a of result.answers) {

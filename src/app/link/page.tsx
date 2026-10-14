@@ -31,7 +31,7 @@ export default async function LinkPhone({ searchParams }: { searchParams: Promis
         <>
           <p><strong>Your phone is signed in.</strong></p>
           <p>It opens the Broker Assistant in a few seconds. You can close this page.</p>
-          <a className="secondary link-btn" href="/">Back to the Broker Assistant</a>
+          <a className="secondary signin-btn" href="/">Back to the Broker Assistant</a>
         </>
       ) : (
         <>

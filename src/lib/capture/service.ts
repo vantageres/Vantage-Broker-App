@@ -12,6 +12,7 @@ import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 import { askKind, asksForListings } from "../lookup/question";
 import { summarize, type SummaryPoint } from "../lookup/summary";
 import { TEST_PROPERTY_BOARDS, loadProperties } from "../monday/properties";
+import { TEST_PROPERTY_LEADS, findLeads, leadView, loadPropertyLeads, type PropertyLeadRecord, type PropertyLeadView } from "../property-leads/board";
 import { describeQuery, hasFilters, knownTowns, queryFromRequirement, readQuery, searchProperties, type PropertyHit } from "../property/search";
 
 // The boards the app works on. Only the test boards until cutover.
@@ -128,13 +129,26 @@ export type LookupResult =
         elsewhere: boolean; // nothing fit in that town, so these are from anywhere
       };
     }
-  | { kind: "summary"; points: SummaryPoint[]; recordsRead: number };
+  | { kind: "summary"; points: SummaryPoint[]; recordsRead: number }
+  | { kind: "propertyLeads"; leads: PropertyLeadView[] };
 
 const DETAILED = 3;
 const LISTED = 10;
 const PROPERTIES_SHOWN = 12;
 
 export const PROPERTY_BOARDS = TEST_PROPERTY_BOARDS;
+export const PROPERTY_LEADS_BOARD = TEST_PROPERTY_LEADS;
+
+// Property Leads is a private board: a broker who hasn't been added to it
+// gets nothing here rather than an error.
+async function propertyLeadsFor(ctx: Context): Promise<PropertyLeadRecord[]> {
+  try {
+    return await loadPropertyLeads(ctx.monday, PROPERTY_LEADS_BOARD, ctx.accountSlug);
+  } catch (error) {
+    console.error(`[lookup] Property Leads not read: ${error instanceof Error ? error.message : "unknown"}`);
+    return [];
+  }
+}
 
 const loadAllProperties = async (ctx: Context) =>
   (await Promise.all(Object.values(PROPERTY_BOARDS).map((b) => loadProperties(ctx.monday, b, ctx.accountSlug)))).flat();
@@ -187,13 +201,16 @@ const hasRequirement = (r: PersonRecord) =>
 // Lookups read Monday when asked, never the cached copy.
 export async function lookup(ctx: Context, question: string): Promise<LookupResult> {
   forgetRecords(ctx.sid);
-  const records = await recordsFor(ctx.monday, ctx.sid, ctx.accountSlug);
+  const [records, leads] = await Promise.all([recordsFor(ctx.monday, ctx.sid, ctx.accountSlug), propertyLeadsFor(ctx)]);
   const hits = findMentioned(question, records);
   const kind = askKind(question);
   const named = hits.length > 0 && hits[0].strength === "strong";
   // One person named (Maria Chen in Leads and Contacts is still one person).
   const onePerson = named && new Set(hits.map((h) => h.record.name.toLowerCase())).size === 1;
   if (onePerson && asksForListings(question)) return listingsFor(ctx, hits[0].record);
+  // A Property Lead named by name or street address ("22 Elm St").
+  const namedLeads = named ? [] : findLeads(question, leads);
+  if (namedLeads.length) return { kind: "propertyLeads", leads: namedLeads.slice(0, DETAILED).map((l) => leadView(l, ctx.me)) };
 
   if (!named && kind === "summary") {
     const relevant = records.filter(hasRequirement);
