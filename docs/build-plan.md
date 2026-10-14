@@ -171,12 +171,17 @@ Speed tests on the full item counts run read-only against the live Leads and Con
 
 **Decision (Oct 14, 2026):** start with Claude Opus 5.5 at medium effort, with server-side fallback on.
 
-First real runs on the test boards (Oct 14): Claude took 2.8 to 5.6 seconds per note, and each extraction was correct for the Dave Reyes example, the two Daves, and Ray Fulton.
+First real runs on the test boards (Oct 14): Claude took 2.8 to 7.0 seconds per note, and each extraction was correct for the Dave Reyes example, the two Daves, and Ray Fulton. Results vary between runs of the same note: timing ranged 3.6 to 7.0 seconds, and optional details (such as "Looking to buy" in Notes) appeared in one run and not another.
 
 **To do: compare Sonnet 5.5 and Haiku 5.5 for speed and accuracy.**
 
 - Use a fixed set of about 20 real-style notes covering every test scenario, plus messy ones (dictation errors, several people in one note, vague dates).
-- Run each note on Opus 5.5, Sonnet 5.5, and Haiku 5.5 with `npm run try-capture -- --model <id> "note"`. Haiku has no server-side fallback.
+- Run each note on Opus 5.5 (medium and low effort), Sonnet 5.5, and Haiku 5.5 with `npm run try-capture -- --model <id> "note"`. Haiku has no server-side fallback.
+- Run each note at least three times per model, because results vary between runs. Compare median and worst-case time, not a single run.
 - Score each extraction field by field against the expected answer, and record time and cost per note.
 - Pick the cheapest, fastest model whose accuracy matches Opus on the scenarios that matter most: never guessing a date, phone number, or email, and placing values that don't fit into Notes.
 - Repeat with pilot notes once brokers are using the app.
+
+## Open: weekday names
+
+Claude turns a bare weekday ("call him Tuesday") into the next such date without asking. Proposed: keep that, and show the weekday with the date on the approval screen ("Tue, Oct 20") so a misread is easy to spot. Alternative: always ask. Waiting on John.
