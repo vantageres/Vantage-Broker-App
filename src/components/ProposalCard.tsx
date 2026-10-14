@@ -61,6 +61,8 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   onReplace: (p: Proposal) => void;
 }) {
   const [attach, setAttach] = useState(attachByDefault && photos.length > 0);
+  const sign = proposal.extra?.signProperty;
+  const [linkSign, setLinkSign] = useState(!!sign?.linkable);
   const [status, setStatus] = useState<Status>({ kind: "review" });
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     setStatus({ kind: "working", what: "Loading…" });
     try {
       const { proposal: next } = await post<{ proposal: Proposal }>("/api/capture/resolve", {
-        person: proposal.person, noteText: proposal.noteText, choice,
+        person: proposal.person, noteText: proposal.noteText, choice, extra: proposal.extra,
       });
       onReplace(next);
     } catch (e) {
@@ -224,7 +226,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     }
     if (notesAdded.trim()) changes.push({ field: "notes", value: notesKept ? `${notesKept.replace(/[.;\s]+$/, "")}. ${notesAdded.trim()}` : notesAdded.trim() });
     const target: SaveRequest["target"] = t.kind === "existing" ? { kind: "existing", board: t.record.board, id: t.record.id } : { kind: "new-lead" };
-    return { target, changes, noteText: proposal.noteText, photos: attaching };
+    return { target, changes, noteText: proposal.noteText, photos: attaching, ...(sign?.linkable && linkSign ? { linkProperty: sign.id } : {}) };
   }
 
   async function save(request: SaveRequest) {
@@ -366,6 +368,25 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
       {proposal.automations.map((a, i) => (
         <div className="callout auto" key={i}><Bolt /><span>{a}</span></div>
       ))}
+      {sign ? (
+        <div className="callout auto sign-property">
+          <span>
+            {sign.how === "location" ? "Near where you took the photo" : "From the address on the sign"}:{" "}
+            <a href={sign.url} target="_blank" rel="noreferrer">{sign.name} <Out /></a>{" "}
+            <span className="sub">({sign.boardLabel}{sign.metres !== undefined ? `, about ${sign.metres} m away` : ""})</span>
+            {sign.linkable ? (
+              <label className="link-choice">
+                <input type="checkbox" checked={linkSign} disabled={working} onChange={(e) => setLinkSign(e.target.checked)} />
+                Link it to Associated Properties
+              </label>
+            ) : (
+              <span className="sub" style={{ display: "block" }}>Not linked: Associated Properties links to the old Properties board only.</span>
+            )}
+          </span>
+        </div>
+      ) : proposal.extra?.sourceForNew === "Sign" && (
+        <div className="callout auto"><span>No property in Monday was found near this sign.</span></div>
+      )}
       {photos.length > 0 && (
         <div className="attach-photos">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -27,6 +27,21 @@ function load(file: File): Promise<HTMLImageElement> {
   });
 }
 
+// The phone's location, to find the property a sign stands at. Asked only
+// when a photo is sent from a phone; the phone asks the broker's permission
+// the first time. Denied or off means no location; slow gives up after about 5 seconds.
+export function phoneLocation(timeoutMs = 5000): Promise<{ lat: number; lng: number } | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs + 500);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { clearTimeout(timer); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      () => { clearTimeout(timer); resolve(null); },
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60_000 },
+    );
+  });
+}
+
 export async function shrinkPhoto(file: File): Promise<ShrunkPhoto> {
   // Browsers turn the image upright from its camera orientation when drawing it.
   const img = await load(file);

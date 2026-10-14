@@ -1,4 +1,5 @@
 import type { MondayClient } from "../monday/client";
+import { pointOf, type MapPoint } from "../monday/properties";
 import { SaveRefused, type Me } from "../monday/write";
 import {
   FIELDS, LEAD_PROPERTY_TYPES, LISTING_TYPES, MONDAY_ONLY_STATUSES, SETTABLE_STATUSES, fieldDef, sameValue,
@@ -49,6 +50,7 @@ export interface PropertyLeadRecord {
   url: string;
   updatedAt: string;
   ownerIds: string[];
+  point: MapPoint | null;
   brokers: { broker: string; coBroker: string; coBroker2: string };
   values: Record<LeadField, string>;
   info: { location: string; county: string; zip: string; created: string; inMarketing: string; onMarket: string; genFolder: string; folderUrl: string };
@@ -56,7 +58,7 @@ export interface PropertyLeadRecord {
 }
 
 // What the broker's screen gets: sensitive values only for the people assigned.
-export interface PropertyLeadView extends Omit<PropertyLeadRecord, "ownerIds" | "values"> {
+export interface PropertyLeadView extends Omit<PropertyLeadRecord, "ownerIds" | "values" | "point"> {
   canEdit: boolean;
   values: Partial<Record<LeadField, string>>;
 }
@@ -103,6 +105,7 @@ export function toLeadRecord(board: LeadBoard, item: RawItem, accountSlug: strin
     name: item.name,
     url: `https://${accountSlug}.monday.com/boards/${board.boardId}/pulses/${item.id}`,
     updatedAt: item.updated_at,
+    point: pointOf(col(i.location)?.value),
     ownerIds: [...new Set([i.broker, i.coBroker, i.coBroker2].flatMap((id) => personIds(col(id)?.value ?? null)))],
     brokers: { broker: text(i.broker), coBroker: text(i.coBroker), coBroker2: text(i.coBroker2) },
     values,
@@ -119,9 +122,10 @@ export function leadView(record: PropertyLeadRecord, me: Me): PropertyLeadView {
   const values = Object.fromEntries(
     FIELDS.filter((f) => canEdit || !f.sensitive).map((f) => [f.field, record.values[f.field]]),
   ) as Partial<Record<LeadField, string>>;
-  const { ownerIds: _owners, values: _all, ...rest } = record;
+  const { ownerIds: _owners, values: _all, point: _point, ...rest } = record;
   void _owners;
   void _all;
+  void _point;
   return { ...rest, canEdit, values };
 }
 

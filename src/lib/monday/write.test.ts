@@ -157,3 +157,37 @@ describe("photos", () => {
     expect(() => columnValue(TEST_BOARDS.leads, { field: "contactAddress", value: "12 Main St", location })).toThrow("Leads have no address field");
   });
 });
+
+describe("linking a sign's property", () => {
+  // Owner reads, the property's board, and the record's current links.
+  function linkMonday(propertyBoard: string, links: string[]) {
+    const fake = fakeMonday([{ contactBroker: [1], names: "John Smyth" }]);
+    const query = fake.client.query.bind(fake.client);
+    fake.client.query = async <T,>(q: string, vars: Record<string, unknown> = {}) => {
+      if (q.includes("items(ids: $id) { board { id } }")) return { items: [{ board: { id: propertyBoard } }] } as T;
+      if (q.includes("linked_item_ids")) return { items: [{ column_values: [{ linked_item_ids: links }] }] } as T;
+      return query<T>(q, vars);
+    };
+    return fake;
+  }
+  const OLD = "18435327033";
+
+  it("adds the property to the record's links, keeping the ones there", async () => {
+    const { client, mutations } = linkMonday(OLD, ["111"]);
+    await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "", linkProperty: "555" }, { linkableBoardId: OLD });
+    expect(JSON.parse(mutations[0].vars.values as string)).toEqual({ board_relation_mkr7eesb: { item_ids: [111, 555] } });
+  });
+
+  it("links a new Lead to it", async () => {
+    const { client, mutations } = linkMonday(OLD, []);
+    await saveProposal(client, TEST_BOARDS, ME, { target: { kind: "new-lead" }, changes: [{ field: "name", value: "Brightline Realty" }], noteText: "", linkProperty: "555" }, { linkableBoardId: OLD });
+    expect(JSON.parse(mutations[0].vars.values as string)).toMatchObject({ board_relation_mkr7eesb: { item_ids: [555] } });
+  });
+
+  it("refuses a property that isn't on the old Properties board, before writing", async () => {
+    const { client, mutations } = linkMonday("18435327265", []);
+    await expect(saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "x", linkProperty: "555" }, { linkableBoardId: OLD }))
+      .rejects.toThrow("old Properties board");
+    expect(mutations).toEqual([]);
+  });
+});

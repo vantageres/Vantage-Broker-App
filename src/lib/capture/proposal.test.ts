@@ -252,3 +252,26 @@ describe("a business card", () => {
     expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("Title: Practice Manager");
   });
 });
+
+describe("a sign", () => {
+  const sign = person({ business_name: "Brightline Realty", contact_type: "Broker", phones: ["856-555-0188"] });
+  const extra = {
+    sourceForNew: "Sign" as const,
+    notes: [{ text: "Sign: For Lease, 5,000 sf retail", why: "What the sign offers describes the property, not what this person wants, so it goes in Notes." }],
+  };
+
+  it("makes a new Lead with Source = Sign and the listing in Notes", () => {
+    const p = buildProposal(sign, [], ME, "Added from a sign photo.", TODAY, extra);
+    expect(p.subject).toBe("Brightline Realty");
+    expect(p.changes.find((c) => c.field === "source")?.proposed).toBe("Sign");
+    expect(p.changes.find((c) => c.field === "notes")?.proposed).toBe("Sign: For Lease, 5,000 sf retail");
+    expect(p.extra).toBe(extra);
+  });
+
+  it("leaves Source alone when the sign's number is already in Monday", () => {
+    const known = record({ name: "Brightline Realty", phones: ["8565550188"], current: { ...record({ name: "x" }).current, source: "Referral" } });
+    const p = buildProposal(sign, [known], ME, "Added from a sign photo.", TODAY, extra);
+    expect(p.target.kind).toBe("existing");
+    expect(p.changes.find((c) => c.field === "source")).toBeUndefined();
+  });
+});

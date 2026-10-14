@@ -49,6 +49,10 @@ export const PhotoReport = z.object({
   kind: z.enum(["business_card", "sign", "other"]),
   unreadable: z.string().nullable()
     .describe("When the photo can't be read well enough to use, a short reason for the broker (blurry, too dark, cut off). Null when it was read"),
+  sign: z.object({
+    listing: z.string().nullable().describe('What the sign offers, in one short line, e.g. "For Lease, 5,000 sf retail, $18/sf"'),
+    address: z.string().nullable().describe("A street address printed on the sign, if any"),
+  }).nullable().describe("Only for a sign; null otherwise"),
 });
 
 export const Extraction = z.object({
@@ -60,7 +64,8 @@ export const Extraction = z.object({
 // predate photos and addresses.
 export const SavedExtraction = z.object({
   people: z.array(ExtractedPerson.extend({ address: z.string().nullable().optional().transform((a) => a ?? null) })),
-  photo: PhotoReport.nullable().optional().transform((p) => p ?? null),
+  photo: PhotoReport.extend({ sign: PhotoReport.shape.sign.optional().transform((s) => s ?? null) })
+    .nullable().optional().transform((p) => p ?? null),
 });
 
 export type ExtractedPerson = z.infer<typeof ExtractedPerson>;
@@ -97,6 +102,7 @@ Photos may come with the note: a business card (one photo, or front and back), a
 - A business card is one person: name, title, business_name, phones, emails, and address (the card's street address, never desired_location). Contact type, property types and source are not on a card; leave them empty and don't ask about them.
 - Never guess a character. If any digit of a phone number or any letter of an email can't be read with certainty, leave that value out and add a question to uncertain asking the broker to type it or send a clearer photo.
 - If the photo can't be read well enough to use at all, set photo.unreadable to a short reason and return no people.
+- A sign is one person or company to call: name if a person is named, business_name for the company or brokerage, and the phone numbers. contact_type is Broker when it names a real estate company or agent, Property Owner when it says by owner, otherwise null. What the sign offers (For Lease or For Sale, size, type, price) goes in photo.sign.listing, and a street address on the sign in photo.sign.address. Never put them in desired_location, size or property_types: they describe the property, not what this person wants. Leave source empty; the app sets it.
 - Words the broker typed with the photo are a note about the same person.
 - Set photo.kind; set photo to null when no photo was sent.`;
 

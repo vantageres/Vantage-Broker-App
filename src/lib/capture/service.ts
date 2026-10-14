@@ -6,7 +6,9 @@ import { loadPersonRecords, type PersonRecord } from "../monday/records";
 import { IdleCache } from "../memory";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
-import { buildProposal, proposalFor, type Broker, type Proposal } from "./proposal";
+import { buildProposal, proposalFor, type Broker, type Proposal, type ProposalExtra } from "./proposal";
+import { findSignProperty } from "../property/near";
+import type { MapPoint } from "../monday/properties";
 import { findMentioned } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 import { askKind, asksForListings } from "../lookup/question";
@@ -87,17 +89,37 @@ export function photoNoteText(note: string, photo: PhotoReport | null): string {
   return [PHOTO_NOTE[photo.kind], note].filter(Boolean).join("\n\n");
 }
 
-export async function capture(ctx: Context, note: string, photos: Photo[] = []): Promise<CaptureResult> {
+// For a sign: the listing line for Notes, Source = Sign for a new Lead, and
+// the property it stands at (by the phone's location, or the sign's address).
+async function signExtra(ctx: Context, photo: PhotoReport, location: MapPoint | null, places: Promise<[Awaited<ReturnType<typeof loadAllProperties>>, PropertyLeadRecord[]]>): Promise<ProposalExtra> {
+  const extra: ProposalExtra = { sourceForNew: "Sign" };
+  if (photo.sign?.listing) extra.notes = [{ text: `Sign: ${photo.sign.listing}`, why: "What the sign offers describes the property, not what this person wants, so it goes in Notes." }];
+  try {
+    const [properties, leads] = await places;
+    const found = findSignProperty(properties, leads, { location, address: photo.sign?.address });
+    if (found) extra.signProperty = found;
+  } catch (error) {
+    console.error(`[capture] properties not read for a sign: ${error instanceof Error ? error.message : "unknown"}`);
+  }
+  return extra;
+}
+
+export async function capture(ctx: Context, note: string, photos: Photo[] = [], location: MapPoint | null = null): Promise<CaptureResult> {
   const today = todayInNewJersey();
   const dev = devExtraction();
+  // A photo may be a sign; read the property boards meanwhile, so finding its
+  // property adds no wait.
+  const places = photos.length ? Promise.all([loadAllProperties(ctx), propertyLeadsFor(ctx)]) : null;
+  places?.catch(() => {}); // a failure is reported where it's used
   const [extraction, records] = await Promise.all([
     dev ? Promise.resolve(dev) : extractPeople(claude(), note, today, undefined, photos),
     recordsFor(ctx.monday, ctx.sid, ctx.accountSlug),
   ]);
-  const photo = photos.length ? extraction.photo ?? { kind: "other" as const, unreadable: null } : null;
+  const photo = photos.length ? extraction.photo ?? { kind: "other" as const, unreadable: null, sign: null } : null;
   if (photo?.unreadable && extraction.people.length === 0) return { proposals: [], photo };
   const noteText = photoNoteText(note, photo);
-  const proposals = await Promise.all(extraction.people.map((p) => withMap(buildProposal(p, records, ctx.me, noteText, today))));
+  const extra = photo?.kind === "sign" && places ? await signExtra(ctx, photo, location, places) : undefined;
+  const proposals = await Promise.all(extraction.people.map((p) => withMap(buildProposal(p, records, ctx.me, noteText, today, extra))));
   return { proposals, photo };
 }
 
@@ -107,14 +129,15 @@ export async function resolve(
   person: ExtractedPerson,
   noteText: string,
   choice: { board: "leads" | "contacts"; id: string } | "new",
+  extra?: ProposalExtra,
 ): Promise<Proposal> {
   const today = todayInNewJersey();
-  if (choice === "new") return withMap(proposalFor(person, null, ctx.me, noteText, today));
+  if (choice === "new") return withMap(proposalFor(person, null, ctx.me, noteText, today, [], extra));
   forgetRecords(ctx.sid); // read fresh: the record may have just been claimed
   const records = await recordsFor(ctx.monday, ctx.sid, ctx.accountSlug);
   const record = records.find((r) => r.board.key === choice.board && r.id === choice.id);
   if (!record) throw new Error("That record wasn't found. It may have been moved or deleted.");
-  return withMap(proposalFor(person, record, ctx.me, noteText, today, ["your choice"]));
+  return withMap(proposalFor(person, record, ctx.me, noteText, today, ["your choice"], extra));
 }
 
 export interface ListedRecord {

@@ -80,6 +80,23 @@ export interface Suite {
   expires: string;
 }
 
+export interface MapPoint {
+  lat: number;
+  lng: number;
+}
+
+// A Monday location column's value: {"lat":"39.93","lng":"-74.89","address":"..."}.
+export function pointOf(value: string | null | undefined): MapPoint | null {
+  if (!value) return null;
+  try {
+    const v = JSON.parse(value) as { lat?: string | number; lng?: string | number };
+    const lat = Number(v.lat), lng = Number(v.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0) ? { lat, lng } : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PropertyRecord {
   board: PropertyBoardKey;
   boardLabel: string;
@@ -88,6 +105,7 @@ export interface PropertyRecord {
   url: string;
   updatedAt: string;
   address: string;
+  point: MapPoint | null; // where Monday's Location column puts it
   status: string;
   deal: string;
   types: string[]; // the property's own type, or its suites' types
@@ -99,7 +117,7 @@ export interface PropertyRecord {
   suites: Suite[];
 }
 
-interface RawColumn { id: string; text: string | null }
+interface RawColumn { id: string; text: string | null; value?: string | null }
 interface RawItem {
   id: string;
   name: string;
@@ -142,6 +160,7 @@ export function toPropertyRecord(board: PropertyBoard, item: RawItem, accountSlu
     url: `https://${accountSlug}.monday.com/boards/${board.boardId}/pulses/${item.id}`,
     updatedAt: item.updated_at,
     address: t(c.location),
+    point: pointOf(item.column_values.find((x) => x.id === c.location)?.value),
     status: t(c.status),
     deal: t(c.deal),
     types,
@@ -156,7 +175,7 @@ export function toPropertyRecord(board: PropertyBoard, item: RawItem, accountSlu
 
 const ITEM_FIELDS = (withSuites: boolean) => `
   id name updated_at
-  column_values(ids: $columns) { id text }
+  column_values(ids: $columns) { id text value }
   ${withSuites ? "subitems { id name column_values(ids: $suiteColumns) { id text } }" : ""}`;
 
 export async function loadProperties(monday: MondayClient, board: PropertyBoard, accountSlug: string): Promise<PropertyRecord[]> {

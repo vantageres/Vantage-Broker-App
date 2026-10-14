@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { shrinkPhoto, type ShrunkPhoto } from "@/lib/photo-client";
+import { phoneLocation, shrinkPhoto, type ShrunkPhoto } from "@/lib/photo-client";
 import type { PhotoReport } from "@/lib/capture/extract";
 import type { Proposal } from "@/lib/capture/proposal";
 import type { LookupResult } from "@/lib/capture/service";
@@ -89,10 +89,12 @@ export function Conversation({ firstName }: { firstName: string }) {
       return;
     }
     try {
+      // A photo taken on a phone may be a sign: where the broker is standing finds its property.
+      const location = withPhotos.length && onPhone ? await phoneLocation() : null;
       const res = await fetch("/api/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, photos: withPhotos.map(({ data, mediaType }) => ({ data, mediaType })) }),
+        body: JSON.stringify({ note, photos: withPhotos.map(({ data, mediaType }) => ({ data, mediaType })), location }),
       });
       const data = (await res.json().catch(() => ({}))) as { proposals?: Proposal[]; photo?: PhotoReport | null; error?: string };
       if (res.status === 401) {

@@ -1,6 +1,16 @@
 import { normalizePhone, splitEmails, type PersonRecord, type RequirementField } from "../monday/records";
 import { findMatches, type MatchCandidate, type MatchResult } from "../matching";
 import type { ExtractedPerson, UNCERTAIN_FIELDS } from "./extract";
+import type { SignProperty } from "../property/near";
+
+// What a photo adds beyond the person: lines for Notes (a sign's listing),
+// the Source for a new Lead, and the property a sign was found at. Kept on the
+// proposal so it survives the broker picking a match.
+export interface ProposalExtra {
+  notes?: { text: string; why: string }[];
+  sourceForNew?: "Sign";
+  signProperty?: SignProperty;
+}
 
 // Which record field each of Claude's uncertain fields would have filled.
 const UNCERTAIN_TO_FIELD: Partial<Record<(typeof UNCERTAIN_FIELDS)[number], RequirementField>> = {
@@ -76,6 +86,7 @@ export interface Proposal {
   // The record's current Property Type, so answers and edits add to it
   // instead of silently replacing it.
   currentPropertyType?: string;
+  extra?: ProposalExtra;
 }
 
 export interface Broker {
@@ -118,7 +129,7 @@ function isOwner(r: PersonRecord, me: Broker): boolean {
 }
 
 // Proposed values for one person, before comparing with any current record.
-function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNotes"]) {
+function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNotes"], extra: ProposalExtra = {}) {
   const values: Partial<Record<RequirementField, string>> = {};
   if (p.business_name) values.businessName = p.business_name;
   if (p.contact_type) values.contactType = p.contact_type;
@@ -143,6 +154,10 @@ function proposedValues(p: ExtractedPerson, placedInNotes: Proposal["placedInNot
         ? "Budget holds a single dollar amount, so rent per foot and price ranges go in Notes."
         : "No field holds these details, so they go in Notes.",
     });
+  }
+  for (const n of extra.notes ?? []) {
+    notes.push(n.text);
+    placedInNotes.push(n);
   }
   if (p.title) {
     notes.push(`Title: ${p.title}`);
@@ -232,12 +247,13 @@ export function proposalFor(
   noteText: string,
   today: string,
   matchedOn: string[] = [],
+  extra?: ProposalExtra,
 ): Proposal {
   const placedInNotes: Proposal["placedInNotes"] = [];
-  const values = proposedValues(person, placedInNotes);
+  const values = proposedValues(person, placedInNotes, extra);
   const questions = questionsFor(person, today);
   const subject = person.name ?? person.business_name ?? "Unnamed person";
-  const base = { person, subject, noteText, placedInNotes, questions, automations: [] as string[] };
+  const base = { person, subject, noteText, placedInNotes, questions, automations: [] as string[], ...(extra ? { extra } : {}) };
 
   // Only Contacts have an address column; on a Lead (new or existing) the
   // address goes in Notes.
@@ -250,6 +266,9 @@ export function proposalFor(
   }
 
   if (!record) {
+    // A new Lead from a sign: Source says so. An existing record's Source,
+    // how the broker first met them, is left as it is.
+    if (extra?.sourceForNew && !values.source) values.source = extra.sourceForNew;
     const changes: FieldChange[] = [
       { field: "name", label: LABELS.name, current: "", proposed: subject },
       ...diff(values),
@@ -310,13 +329,14 @@ export function buildProposal(
   me: Broker,
   noteText: string,
   today: string,
+  extra?: ProposalExtra,
 ): Proposal {
   const match: MatchResult = findMatches(
     { name: person.name, businessName: person.business_name, phones: person.phones, emails: person.emails },
     records,
   );
-  if (match.kind === "none") return proposalFor(person, null, me, noteText, today);
-  if (match.kind === "one") return proposalFor(person, match.candidate.record, me, noteText, today, match.candidate.reasons);
+  if (match.kind === "none") return proposalFor(person, null, me, noteText, today, [], extra);
+  if (match.kind === "one") return proposalFor(person, match.candidate.record, me, noteText, today, match.candidate.reasons, extra);
 
   const subject = person.name ?? person.business_name ?? "Unnamed person";
   const candidates = match.kind === "several" ? match.candidates : [match.recommended, match.other];
@@ -327,6 +347,7 @@ export function buildProposal(
     noteText,
     placedInNotes: [],
     automations: [],
+    ...(extra ? { extra } : {}),
     target: { kind: "pick", candidates: pickList(candidates), recommended },
     changes: [],
     // Only the match question for now: the rest depend on which record is picked.

@@ -22,6 +22,32 @@ export interface SaveRequest {
   noteText: string;
   // Approved photos for the record's Files column (a business card, front and back).
   photos?: Photo[];
+  // A property on the old Properties board to add to Associated Properties
+  // (the property a sign stands at).
+  linkProperty?: string;
+}
+
+export interface SaveOptions {
+  // Associated Properties on Leads and Contacts links to this board only.
+  linkableBoardId?: string;
+}
+
+// The property must be on the board Associated Properties links to.
+async function checkLinkable(monday: MondayClient, itemId: string | undefined, options: SaveOptions): Promise<string | null> {
+  if (!itemId) return null;
+  if (!/^\d+$/.test(itemId) || !options.linkableBoardId) throw new SaveRefused("That property can't be linked.");
+  const data = await monday.query<{ items: { board: { id: string } }[] }>(`query ($id: [ID!]) { items(ids: $id) { board { id } } }`, { id: [itemId] });
+  if (data.items[0]?.board.id !== options.linkableBoardId) throw new SaveRefused("Only properties on the old Properties board can be linked to a Lead or Contact.");
+  return itemId;
+}
+
+// Adds to the record's links; never replaces the ones already there.
+async function linkedIds(monday: MondayClient, itemId: string, column: string): Promise<string[]> {
+  const data = await monday.query<{ items: { column_values: { linked_item_ids?: string[] }[] }[] }>(
+    `query ($id: [ID!], $col: [String!]) { items(ids: $id) { column_values(ids: $col) { ... on BoardRelationValue { linked_item_ids } } } }`,
+    { id: [itemId], col: [column] },
+  );
+  return data.items[0]?.column_values[0]?.linked_item_ids ?? [];
 }
 
 export interface Me {
@@ -166,9 +192,11 @@ export async function saveProposal(
   boards: Record<"leads" | "contacts", PersonBoard>,
   me: Me,
   request: SaveRequest,
+  options: SaveOptions = {},
 ): Promise<SaveResult> {
   const note = request.noteText.trim();
   const photos = checkPhotos(request.photos);
+  const link = await checkLinkable(monday, request.linkProperty, options);
 
   if (request.target.kind === "new-lead") {
     const board = boards.leads;
@@ -182,13 +210,14 @@ export async function saveProposal(
       const cv = columnValue(board, change);
       if (cv) values[cv[0]] = cv[1];
     }
+    if (link) values[board.propertyLinks[0]] = { item_ids: [Number(link)] };
     const created = await monday.query<{ create_item: { id: string } }>(
       `mutation ($board: ID!, $name: String!, $values: JSON!) {
          create_item(board_id: $board, item_name: $name, column_values: $values, create_labels_if_missing: false) { id }
        }`,
       { board: board.boardId, name, values: JSON.stringify(values) },
     );
-    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length, noteAdded: false, photosAttached: 0 };
+    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length + (link ? 1 : 0), noteAdded: false, photosAttached: 0 };
     return afterFields(monday, board, result, photos, note);
   }
 
@@ -206,6 +235,11 @@ export async function saveProposal(
   for (const change of request.changes) {
     const cv = columnValue(board, change);
     if (cv) values[cv[0]] = cv[1];
+  }
+  if (link) {
+    const column = board.propertyLinks[0];
+    const current = await linkedIds(monday, itemId, column);
+    if (!current.includes(link)) values[column] = { item_ids: [...current, link].map(Number) };
   }
   if (Object.keys(values).length) {
     await monday.query(
