@@ -1,4 +1,5 @@
-// Ask a question the way the app does, against the Monday test boards, and
+// Ask a question the way the app does, against the Monday test boards (or the
+// live ones with MONDAY_BOARDS=live), and
 // print the answer. Reads only; nothing is saved to Monday.
 //
 //   npm run try-lookup -- "retail around 2,000 sf"

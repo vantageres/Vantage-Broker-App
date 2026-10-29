@@ -1,6 +1,14 @@
 // Board and column ids for the Monday boards the app reads and writes.
-// The test workspace ids come from docs/monday-test-boards.md. Live ids are
-// added at cutover; nothing else in the app hard-codes an id.
+// The test workspace ids come from docs/monday-test-boards.md; the live boards
+// use the same column ids (checked Oct 29, 2026). Nothing else in the app
+// hard-codes an id.
+
+// Which boards the app uses. The deployed app uses the live boards; local
+// runs and scripts use the test boards unless MONDAY_BOARDS=live is set, so
+// trying something out never writes to a real client by accident.
+export const USE_LIVE_BOARDS = process.env.MONDAY_BOARDS
+  ? process.env.MONDAY_BOARDS === "live"
+  : process.env.NODE_ENV === "production";
 
 // The Vantage Monday account's web address, used for "Open in Monday" links.
 // Fixed, so sign-in doesn't need the account:read scope to look it up.
@@ -85,6 +93,14 @@ export const TEST_BOARDS: Record<PersonBoardKey, PersonBoard> = {
     contactTypeUnset: "Not Labeled",
     propertyLinks: ["connect_boards7", "board_relation_mm839kb1"],
   },
+};
+
+// The live boards (Main workspace): same columns, different board ids. Live
+// Contacts has no link to Properties New; its Associated Properties column
+// links to the old Properties board, as on the test board.
+export const LIVE_BOARDS: Record<PersonBoardKey, PersonBoard> = {
+  leads: { ...TEST_BOARDS.leads, boardId: "8842865081" },
+  contacts: { ...TEST_BOARDS.contacts, boardId: "8842962019", propertyLinks: ["connect_boards7"] },
 };
 
 export const BROKER_NOTE_ACTIVITY_ID = "a087433e-74e8-45bb-9a91-a16346e18fbc";

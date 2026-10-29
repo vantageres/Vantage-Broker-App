@@ -1,5 +1,6 @@
 // Run a broker note through the capture pipeline against the Monday test
-// boards and print the proposals. Reads only; nothing is saved to Monday.
+// boards (or the live ones with MONDAY_BOARDS=live) and print the proposals.
+// Reads only; nothing is saved to Monday.
 //
 //   npm run try-capture -- "Met Dave Reyes at Garrison Foods..."
 //   npm run try-capture -- --model claude-sonnet-5-5 "note text"
@@ -11,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { mondayClient } from "../src/lib/monday/client";
-import { TEST_BOARDS } from "../src/lib/monday/boards";
+import { BOARDS } from "../src/lib/capture/service";
 import { searchPersonRecords } from "../src/lib/monday/records";
 import { matchTerms } from "../src/lib/matching";
 import { CAPTURE_MODELS, extractPeople, SavedExtraction, type CaptureModel } from "../src/lib/capture/extract";
@@ -57,7 +58,7 @@ const extractedAt = Date.now();
 // Monday is searched for the people Claude found, as the app does.
 const terms = matchTerms(extraction.people.map((p) => ({ name: p.name, businessName: p.business_name, phones: p.phones, emails: p.emails })));
 const records = (
-  await Promise.all(Object.values(TEST_BOARDS).map((b) => searchPersonRecords(monday, b, account.slug, terms)))
+  await Promise.all(Object.values(BOARDS).map((b) => searchPersonRecords(monday, b, account.slug, terms)))
 ).flat();
 const loadedAt = Date.now();
 

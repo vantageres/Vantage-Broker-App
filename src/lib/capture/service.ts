@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MondayClient } from "../monday/client";
-import { TEST_BOARDS, type PersonBoard } from "../monday/boards";
+import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms } from "../matching";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
@@ -13,12 +13,12 @@ import { findMentioned, questionTerms } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 import { askKind, asksForListings } from "../lookup/question";
 import { summarize, type SummaryPoint } from "../lookup/summary";
-import { TEST_PROPERTY_BOARDS, loadProperties } from "../monday/properties";
-import { TEST_PROPERTY_LEADS, findLeads, leadView, loadPropertyLeads, type PropertyLeadRecord, type PropertyLeadView } from "../property-leads/board";
+import { LIVE_PROPERTY_BOARDS, TEST_PROPERTY_BOARDS, loadProperties } from "../monday/properties";
+import { LIVE_PROPERTY_LEADS, TEST_PROPERTY_LEADS, findLeads, leadView, loadPropertyLeads, type PropertyLeadRecord, type PropertyLeadView } from "../property-leads/board";
 import { describeQuery, hasFilters, knownTowns, queryFromRequirement, readQuery, searchProperties, type PropertyHit } from "../property/search";
 
-// The boards the app works on. Only the test boards until cutover.
-export const BOARDS: Record<"leads" | "contacts", PersonBoard> = TEST_BOARDS;
+// The boards the app works on: live when deployed (see USE_LIVE_BOARDS).
+export const BOARDS: Record<"leads" | "contacts", PersonBoard> = USE_LIVE_BOARDS ? LIVE_BOARDS : TEST_BOARDS;
 
 // Leads and Contacts whose name, business name, phone or email contains one
 // of the terms, read fresh from Monday each time. Nothing is kept between
@@ -175,8 +175,8 @@ const DETAILED = 3;
 const LISTED = 10;
 const PROPERTIES_SHOWN = 12;
 
-export const PROPERTY_BOARDS = TEST_PROPERTY_BOARDS;
-export const PROPERTY_LEADS_BOARD = TEST_PROPERTY_LEADS;
+export const PROPERTY_BOARDS = USE_LIVE_BOARDS ? LIVE_PROPERTY_BOARDS : TEST_PROPERTY_BOARDS;
+export const PROPERTY_LEADS_BOARD = USE_LIVE_BOARDS ? LIVE_PROPERTY_LEADS : TEST_PROPERTY_LEADS;
 
 // Property Leads is a private board: a broker who hasn't been added to it
 // gets nothing here rather than an error.

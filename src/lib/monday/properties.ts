@@ -69,6 +69,13 @@ export const TEST_PROPERTY_BOARDS: Record<PropertyBoardKey, PropertyBoard> = {
   },
 };
 
+// Live: Properties New (Brokerage workspace) and the old Properties board
+// (Main workspace). Same columns as the test boards.
+export const LIVE_PROPERTY_BOARDS: Record<PropertyBoardKey, PropertyBoard> = {
+  propertiesNew: { ...TEST_PROPERTY_BOARDS.propertiesNew, boardId: "18420767182" },
+  propertiesOld: { ...TEST_PROPERTY_BOARDS.propertiesOld, boardId: "5076736644" },
+};
+
 export interface Suite {
   id: string;
   name: string;

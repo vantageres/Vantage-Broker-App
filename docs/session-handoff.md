@@ -6,6 +6,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 
 - Branch `claude/spec-review-planning-8omcwd`. Commit and push there. No pull request unless John asks.
 - Live at https://vantage-broker-app.vercel.app. Vercel deploys from the branch.
+- Since Oct 29 the deployed app works on the **live boards** (real clients). Local runs and scripts use the test boards unless `MONDAY_BOARDS=live` is set.
 - Built and confirmed on Vercel by John:
   - Monday sign-in (OAuth 2.1 with PKCE)
   - capture with in-place editing, one question at a time, pick, claim and blocked records
@@ -34,7 +35,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 
 - Never ask John to paste tokens or keys into chat. Never print the Claude key. Never use the session's own Claude credentials for the app.
 - Claude data settings: no training, no retention (see `build-plan.md`).
-- Write only to the test workspace "Broker App Test" (`18004807`). Live boards are read only.
+- Write only to the test workspace "Broker App Test" (`18004807`). Live boards are read only from a session or a PC: brokers change them through the deployed app, never a session. Use `MONDAY_BOARDS=live` only with the read-only scripts.
 - Undo test saves afterwards: reset Linda Park and delete any test Broker Notes.
   - Exception (Oct 14): John asked to keep Linda Park as she is after his capture test (Leasee, Healthcare and Office, 2,500 sf, $6,000, Moorestown, follow-up Oct 20, plus his Broker Note). Don't reset her unless he asks. His note says 2,000 sq ft and the field says 2,500 sf; not yet confirmed whether he edited it on the proposal.
 - Users: John Smyth `44432289` (tester and Operations Manager), Emily Stein `25374507` (second broker).

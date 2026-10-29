@@ -46,6 +46,10 @@ export const TEST_PROPERTY_LEADS: LeadBoard = {
   },
 };
 
+// Live: Property Leads in the Brokerage workspace (not the older one in Main).
+// Same columns as the test board, checked Oct 29, 2026.
+export const LIVE_PROPERTY_LEADS: LeadBoard = { ...TEST_PROPERTY_LEADS, boardId: "18420767300" };
+
 export interface PropertyLeadRecord {
   id: string;
   name: string;

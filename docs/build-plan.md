@@ -270,7 +270,9 @@ When nothing is named and nothing is found, the reply now says what can be asked
 | Vantage Properties New | 18420767182 | Brokerage | 18 | all 108 match |
 | Property Leads | 18420767300 | Brokerage | 5 | all 110 match |
 
-Moving the app to the live boards is mostly a change of board ids. Found:
+**Switched to the live boards Oct 29 (John).** The deployed app (production on Vercel) now reads and writes the live boards above. Local runs and scripts stay on the test boards unless `MONDAY_BOARDS=live` is set (`USE_LIVE_BOARDS` in `src/lib/monday/boards.ts`); `MONDAY_BOARDS=test` keeps a local `next start` on the test boards too. Every column id the app uses was checked on all five live boards and the suites board, read only. Measured on the live boards (read only): capture about 5 seconds with Claude, person lookups under 2.5 seconds, property searches 5.3 to 5.6 seconds (all 419 properties are read), a summary about 26 seconds (all 1,662 Leads and Contacts read, then Claude).
+
+Found in the survey:
 
 1. **Speed (fixed Oct 29).** Loading all 1,622 live Leads and Contacts takes about 10 seconds, so capture and lookups no longer do it. Monday is asked for candidates instead: records whose name or business name contains a word from the note's names (or the question), or whose phone or email contains a number or address from the note. The app's own matching rules then run on those few records, so the results are the same as reading every record (checked on the test boards and, read only, on the live boards). Measured on the live boards: capture's Monday step 0.6 to 1.0 seconds (was 9 to 12), capture about 3.5 to 7 seconds in all with Claude, lookups 0.8 to 1.9 seconds (was 9 to 11). Summaries still read every record: 1,560 of the 1,622 have some requirement detail, too many to send to Claude, so they need narrowing in code first.
 2. **A second Property Leads board.** Property Leads in the Brokerage workspace (18420767300, 5 items, the spec's count) and another in the Main workspace (8637648844, 3 items). The plan assumes the Brokerage one.
