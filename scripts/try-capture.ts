@@ -12,7 +12,8 @@ import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { mondayClient } from "../src/lib/monday/client";
 import { TEST_BOARDS } from "../src/lib/monday/boards";
-import { loadPersonRecords } from "../src/lib/monday/records";
+import { searchPersonRecords } from "../src/lib/monday/records";
+import { matchTerms } from "../src/lib/matching";
 import { CAPTURE_MODELS, extractPeople, SavedExtraction, type CaptureModel } from "../src/lib/capture/extract";
 import { buildProposal, type Proposal } from "../src/lib/capture/proposal";
 import { googleGeocoder, resolveLocations } from "../src/lib/geocode";
@@ -53,8 +54,10 @@ const [{ me, account }, extraction] = await Promise.all([
     : extractPeople(claude(), note, today, model),
 ]);
 const extractedAt = Date.now();
+// Monday is searched for the people Claude found, as the app does.
+const terms = matchTerms(extraction.people.map((p) => ({ name: p.name, businessName: p.business_name, phones: p.phones, emails: p.emails })));
 const records = (
-  await Promise.all(Object.values(TEST_BOARDS).map((b) => loadPersonRecords(monday, b, account.slug)))
+  await Promise.all(Object.values(TEST_BOARDS).map((b) => searchPersonRecords(monday, b, account.slug, terms)))
 ).flat();
 const loadedAt = Date.now();
 
@@ -103,5 +106,5 @@ function print(p: Proposal) {
 
 proposals.forEach(print);
 console.log(
-  `\nTiming: ${extractionFile ? "saved extraction" : model} ${extractedAt - started} ms, Monday load ${loadedAt - extractedAt} ms (${records.length} records)${mapsKey ? `, map lookup ${mappedAt - loadedAt} ms` : ""}`,
+  `\nTiming: ${extractionFile ? "saved extraction" : model} ${extractedAt - started} ms, Monday search ${loadedAt - extractedAt} ms (${records.length} candidates)${mapsKey ? `, map lookup ${mappedAt - loadedAt} ms` : ""}`,
 );

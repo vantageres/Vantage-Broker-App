@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BOARDS, PROPERTY_BOARDS, forgetRecords, itemUrl } from "@/lib/capture/service";
+import { BOARDS, PROPERTY_BOARDS, itemUrl } from "@/lib/capture/service";
 import { NoteNotSaved, saveProposal, SaveRefused, type SaveRequest } from "@/lib/monday/write";
 import { fail, withBroker } from "@/lib/api";
 
@@ -9,10 +9,8 @@ export async function POST(req: Request) {
     const request = (await req.json()) as SaveRequest;
     try {
       const result = await saveProposal(ctx.monday, BOARDS, ctx.me, request, { linkableBoardId: PROPERTY_BOARDS.propertiesOld.boardId });
-      forgetRecords(ctx.sid);
       return NextResponse.json({ result, url: itemUrl(ctx.accountSlug, result.board, result.itemId) });
     } catch (error) {
-      forgetRecords(ctx.sid);
       if (error instanceof SaveRefused) return NextResponse.json({ error: error.message, owner: error.owner }, { status: 409 });
       if (error instanceof NoteNotSaved) {
         return NextResponse.json(

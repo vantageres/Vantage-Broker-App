@@ -1,4 +1,4 @@
-import { normalizePhone, type PersonRecord } from "./monday/records";
+import { normalizePhone, type PersonRecord, type SearchTerms } from "./monday/records";
 
 export interface MatchQuery {
   name: string | null;
@@ -69,6 +69,23 @@ export function scoreRecord(query: MatchQuery, record: PersonRecord): MatchCandi
   const firstNameOnly = !!query.name && !clean(query.name).includes(" ");
   const threshold = firstNameOnly && phones.length === 0 && emails.length === 0 ? 20 : 50;
   return score >= threshold ? { record, score, reasons } : null;
+}
+
+// What to ask Monday for so that every record scoreRecord could accept comes
+// back. A name needs its last word to match (or, given alone, its only word),
+// so the name's words cover it; a business name never matches on its own.
+export function matchTerms(queries: MatchQuery[]): SearchTerms {
+  const words = new Set<string>();
+  const phones = new Set<string>();
+  const emails = new Set<string>();
+  for (const q of queries) {
+    const nameWords = q.name ? clean(q.name).split(" ").filter(Boolean) : [];
+    const last = nameWords.at(-1);
+    for (const w of nameWords) if (w.length >= 3 || w === last) words.add(w);
+    for (const p of q.phones.map(normalizePhone)) if (p.length >= 7) phones.add(p);
+    for (const e of q.emails) if (e.includes("@")) emails.add(e.toLowerCase());
+  }
+  return { words: [...words], phones: [...phones], emails: [...emails] };
 }
 
 export function findMatches(query: MatchQuery, records: PersonRecord[]): MatchResult {

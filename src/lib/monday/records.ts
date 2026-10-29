@@ -99,9 +99,9 @@ export function toPersonRecord(board: PersonBoard, item: RawItem, accountSlug: s
 }
 
 const ITEMS_QUERY = `
-  query ($board: ID!, $cursor: String, $columns: [String!]) {
+  query ($board: ID!, $columns: [String!], $query: ItemsQuery) {
     boards(ids: [$board]) {
-      items_page(limit: 500, cursor: $cursor) {
+      items_page(limit: 500, query_params: $query) {
         cursor
         items { id name updated_at column_values(ids: $columns) { id text value } }
       }
@@ -116,16 +116,23 @@ const NEXT_QUERY = `
     }
   }`;
 
-export async function loadPersonRecords(
-  monday: MondayClient,
-  board: PersonBoard,
-  accountSlug: string,
-): Promise<PersonRecord[]> {
+const BY_ID_QUERY = `
+  query ($ids: [ID!], $columns: [String!]) {
+    items(ids: $ids) { id name updated_at board { id } column_values(ids: $columns) { id text value } }
+  }`;
+
+interface ItemsQuery {
+  operator: "or";
+  rules: { column_id: string; compare_value: string[]; operator: "contains_text" }[];
+}
+
+async function readItems(monday: MondayClient, board: PersonBoard, accountSlug: string, query?: ItemsQuery): Promise<PersonRecord[]> {
   const columns = Object.values(board.columns);
   type Page = { cursor: string | null; items: RawItem[] };
   const first = await monday.query<{ boards: { items_page: Page }[] }>(ITEMS_QUERY, {
     board: board.boardId,
     columns,
+    query,
   });
   let page = first.boards[0].items_page;
   const items = [...page.items];
@@ -135,4 +142,44 @@ export async function loadPersonRecords(
     items.push(...page.items);
   }
   return items.map((item) => toPersonRecord(board, item, accountSlug));
+}
+
+// Every record on the board. Slow on the live boards (about 10 seconds for
+// Leads and Contacts together), so only summaries use it.
+export function loadPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string): Promise<PersonRecord[]> {
+  return readItems(monday, board, accountSlug);
+}
+
+// What to ask Monday for: words found in a name or business name, phone
+// numbers (digits only) and email addresses.
+export interface SearchTerms {
+  words: string[];
+  phones: string[];
+  emails: string[];
+}
+
+// Monday narrows the board to records whose name, business name, phone or
+// email contains one of the terms (any case, any part of a word). It returns
+// candidates only: the app's own matching rules then decide what counts, so
+// the terms must cover everything those rules could match.
+export function searchPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string, terms: SearchTerms): Promise<PersonRecord[]> {
+  const rule = (column_id: string, values: string[]) => ({ column_id, compare_value: values, operator: "contains_text" as const });
+  const rules = [
+    ...(terms.words.length ? [rule("name", terms.words), rule(board.columns.businessName, terms.words)] : []),
+    ...(terms.phones.length ? [rule(board.columns.phone, terms.phones)] : []),
+    ...(terms.emails.length ? [rule(board.columns.email, terms.emails)] : []),
+  ];
+  // No rules would mean the whole board.
+  if (!rules.length) return Promise.resolve([]);
+  return readItems(monday, board, accountSlug, { operator: "or", rules });
+}
+
+// One record, read fresh (after the broker picks it from a list).
+export async function loadPersonRecord(monday: MondayClient, board: PersonBoard, id: string, accountSlug: string): Promise<PersonRecord | null> {
+  const data = await monday.query<{ items: (RawItem & { board: { id: string } })[] }>(BY_ID_QUERY, {
+    ids: [id],
+    columns: Object.values(board.columns),
+  });
+  const item = data.items[0];
+  return item && String(item.board.id) === board.boardId ? toPersonRecord(board, item, accountSlug) : null;
 }

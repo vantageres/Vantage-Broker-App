@@ -116,7 +116,7 @@ The approval card is the most important screen in the app. Start Claude Design o
 
 1. **Approval settings** live on an admin page in the app, used mainly from desktop. Only the Operations Manager can open it.
 2. **Claim race.** Accepted. The app re-reads the owner just before saving, and a small gap remains.
-3. **Session memory.** Search keys (names, phones, emails) and chat context are kept on the server for one chat session only, and are cleared after 10 minutes with no activity.
+3. **Session memory.** Search keys (names, phones, emails) and chat context are kept on the server for one chat session only, and are cleared after 10 minutes with no activity. Since Oct 29 the server keeps no Monday records between requests at all: each capture or lookup asks Monday for the records it needs.
 4. **Claude API data handling.** Approved, on condition that the API account is set so that data is not used for training and is not stored. See "Claude API data settings" below.
 5. **Test boards.** The Operations Manager creates them in a separate workspace. See "Test boards" below.
 
@@ -272,7 +272,7 @@ When nothing is named and nothing is found, the reply now says what can be asked
 
 Moving the app to the live boards is mostly a change of board ids. Found:
 
-1. **Speed.** Loading all 1,622 live Leads and Contacts takes about 11 seconds (6 seconds with only the matching columns); the test boards took 1 second. Lookups reload them every time and capture once per chat session, so lookups would take 11+ seconds against a 5-second target. Asking Monday to search by name (items_page with query rules) answers in under half a second. Summaries: 1,560 of the 1,622 records have some requirement detail, too many to send to Claude, so they need narrowing in code first.
+1. **Speed (fixed Oct 29).** Loading all 1,622 live Leads and Contacts takes about 10 seconds, so capture and lookups no longer do it. Monday is asked for candidates instead: records whose name or business name contains a word from the note's names (or the question), or whose phone or email contains a number or address from the note. The app's own matching rules then run on those few records, so the results are the same as reading every record (checked on the test boards and, read only, on the live boards). Measured on the live boards: capture's Monday step 0.6 to 1.0 seconds (was 9 to 12), capture about 3.5 to 7 seconds in all with Claude, lookups 0.8 to 1.9 seconds (was 9 to 11). Summaries still read every record: 1,560 of the 1,622 have some requirement detail, too many to send to Claude, so they need narrowing in code first.
 2. **A second Property Leads board.** Property Leads in the Brokerage workspace (18420767300, 5 items, the spec's count) and another in the Main workspace (8637648844, 3 items). The plan assumes the Brokerage one.
 3. **Private boards.** Properties New (Brokerage) has only John subscribed, and Property Leads (Brokerage) only John and Emily. Brokers read through their own sign-in, so pilot brokers must be added to both or property searches and Property Leads show them nothing.
 4. **Edit permissions.** Leads and Property Leads allow everyone to edit (spec: align to assigned people). Contacts and Properties New already limit editing to assignees.

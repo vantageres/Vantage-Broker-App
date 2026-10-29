@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { forgetRecords, propertyLeadsFor, recordsFor } from "@/lib/capture/service";
+import { peopleMatching, propertyLeadsFor } from "@/lib/capture/service";
+import { questionTerms } from "@/lib/lookup/search";
 import { findAttachTargets } from "@/lib/attach";
 import { fail, withBroker } from "@/lib/api";
 
@@ -9,8 +10,8 @@ export async function POST(req: Request) {
     const { question } = (await req.json()) as { question?: string };
     if (!question?.trim()) return NextResponse.json({ error: "Say which record the photo is for." }, { status: 400 });
     try {
-      forgetRecords(ctx.sid); // read fresh: ownership matters here
-      const [people, leads] = await Promise.all([recordsFor(ctx.monday, ctx.sid, ctx.accountSlug), propertyLeadsFor(ctx)]);
+      // Read fresh: ownership matters here.
+      const [people, leads] = await Promise.all([peopleMatching(ctx.monday, ctx.accountSlug, questionTerms(question.trim())), propertyLeadsFor(ctx)]);
       return NextResponse.json({ candidates: findAttachTargets(question.trim(), people, leads, ctx.me) });
     } catch (error) {
       return fail(error);

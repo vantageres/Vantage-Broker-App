@@ -1,4 +1,4 @@
-import type { PersonRecord } from "../monday/records";
+import type { PersonRecord, SearchTerms } from "../monday/records";
 
 // Which Leads and Contacts does the question name? A full name or business
 // name in the question is a strong hit. Failing that, a first or last name,
@@ -14,6 +14,26 @@ const GENERIC = new Set([
   "associates", "services", "enterprises", "international", "industries", "properties", "realty",
   "real", "estate", "management", "solutions", "of", "new", "jersey", "nj",
 ]);
+
+// Question words that are never what a name is being matched on. Leaving
+// them out keeps Monday's search short; a record is still found through any
+// other word of its name in the question.
+const QUESTION_WORDS = new Set([
+  "what", "who", "whom", "which", "where", "when", "why", "how", "have", "has", "had", "does", "did",
+  "any", "anything", "about", "for", "with", "from", "that", "this", "there", "their", "still", "show",
+  "look", "find", "tell", "give", "list", "notes", "note", "info", "latest", "update", "updates",
+  "record", "records", "contact", "lead", "can", "you", "are", "was", "his", "her", "him", "she",
+]);
+
+// What to ask Monday for: every word of the question that could be part of a
+// name or business name. findMentioned needs a whole name word (3+ letters)
+// in the question, so these words bring back the records it would find.
+// Shorter words ("is", "on") would match parts of hundreds of names.
+export function questionTerms(question: string): SearchTerms {
+  const words = clean(question).trim().split(" ")
+    .filter((w) => w.length >= 3 && !QUESTION_WORDS.has(w) && !GENERIC.has(w));
+  return { words: [...new Set(words)], phones: [], emails: [] };
+}
 
 export interface Hit {
   record: PersonRecord;

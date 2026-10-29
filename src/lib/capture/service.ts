@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MondayClient } from "../monday/client";
 import { TEST_BOARDS, type PersonBoard } from "../monday/boards";
-import { loadPersonRecords, type PersonRecord } from "../monday/records";
-import { IdleCache } from "../memory";
+import { loadPersonRecord, loadPersonRecords, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
+import { matchTerms } from "../matching";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal, type ProposalExtra } from "./proposal";
 import { findSignProperty } from "../property/near";
 import type { MapPoint } from "../monday/properties";
-import { findMentioned } from "../lookup/search";
+import { findMentioned, questionTerms } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 import { askKind, asksForListings } from "../lookup/question";
 import { summarize, type SummaryPoint } from "../lookup/summary";
@@ -20,20 +20,16 @@ import { describeQuery, hasFilters, knownTowns, queryFromRequirement, readQuery,
 // The boards the app works on. Only the test boards until cutover.
 export const BOARDS: Record<"leads" | "contacts", PersonBoard> = TEST_BOARDS;
 
-// Matching data for each chat session, dropped after 10 idle minutes.
-const sessionRecords = new IdleCache<PersonRecord[]>();
-
-export async function recordsFor(monday: MondayClient, sid: string, accountSlug: string): Promise<PersonRecord[]> {
-  const cached = sessionRecords.get(sid);
-  if (cached) return cached;
-  const records = (await Promise.all(Object.values(BOARDS).map((b) => loadPersonRecords(monday, b, accountSlug)))).flat();
-  sessionRecords.set(sid, records);
-  return records;
+// Leads and Contacts whose name, business name, phone or email contains one
+// of the terms, read fresh from Monday each time. Nothing is kept between
+// requests, so a save or claim is seen at once.
+export async function peopleMatching(monday: MondayClient, accountSlug: string, terms: SearchTerms): Promise<PersonRecord[]> {
+  return (await Promise.all(Object.values(BOARDS).map((b) => searchPersonRecords(monday, b, accountSlug, terms)))).flat();
 }
 
-// After a save or claim the cached copy is stale.
-export function forgetRecords(sid: string) {
-  sessionRecords.delete(sid);
+// Every Lead and Contact. Summaries only: slow on the live boards.
+async function allPeople(monday: MondayClient, accountSlug: string): Promise<PersonRecord[]> {
+  return (await Promise.all(Object.values(BOARDS).map((b) => loadPersonRecords(monday, b, accountSlug)))).flat();
 }
 
 // Dates are Vantage's local dates, not UTC.
@@ -111,10 +107,10 @@ export async function capture(ctx: Context, note: string, photos: Photo[] = [], 
   // property adds no wait.
   const places = photos.length ? Promise.all([loadAllProperties(ctx), propertyLeadsFor(ctx)]) : null;
   places?.catch(() => {}); // a failure is reported where it's used
-  const [extraction, records] = await Promise.all([
-    dev ? Promise.resolve(dev) : extractPeople(claude(), note, today, undefined, photos),
-    recordsFor(ctx.monday, ctx.sid, ctx.accountSlug),
-  ]);
+  const extraction = dev ? dev : await extractPeople(claude(), note, today, undefined, photos);
+  // Monday is searched for the people Claude found, not read in full.
+  const queries = extraction.people.map((p) => ({ name: p.name, businessName: p.business_name, phones: p.phones, emails: p.emails }));
+  const records = await peopleMatching(ctx.monday, ctx.accountSlug, matchTerms(queries));
   const photo = photos.length ? extraction.photo ?? { kind: "other" as const, unreadable: null, sign: null } : null;
   if (photo?.unreadable && extraction.people.length === 0) return { proposals: [], photo };
   const noteText = photoNoteText(note, photo);
@@ -133,9 +129,8 @@ export async function resolve(
 ): Promise<Proposal> {
   const today = todayInNewJersey();
   if (choice === "new") return withMap(proposalFor(person, null, ctx.me, noteText, today, [], extra));
-  forgetRecords(ctx.sid); // read fresh: the record may have just been claimed
-  const records = await recordsFor(ctx.monday, ctx.sid, ctx.accountSlug);
-  const record = records.find((r) => r.board.key === choice.board && r.id === choice.id);
+  // Read fresh: the record may have just been claimed.
+  const record = await loadPersonRecord(ctx.monday, BOARDS[choice.board], choice.id, ctx.accountSlug);
   if (!record) throw new Error("That record wasn't found. It may have been moved or deleted.");
   return withMap(proposalFor(person, record, ctx.me, noteText, today, ["your choice"], extra));
 }
@@ -242,10 +237,9 @@ async function listingsFor(ctx: Context, record: PersonRecord): Promise<LookupRe
 const hasRequirement = (r: PersonRecord) =>
   ["contactType", "propertyType", "size", "budget", "desiredLocation", "notes"].some((k) => r.current[k as keyof PersonRecord["current"]]?.trim());
 
-// Lookups read Monday when asked, never the cached copy.
+// Lookups read Monday when asked: only the records the question could name.
 export async function lookup(ctx: Context, question: string): Promise<LookupResult> {
-  forgetRecords(ctx.sid);
-  const [records, leads] = await Promise.all([recordsFor(ctx.monday, ctx.sid, ctx.accountSlug), propertyLeadsFor(ctx)]);
+  const [records, leads] = await Promise.all([peopleMatching(ctx.monday, ctx.accountSlug, questionTerms(question)), propertyLeadsFor(ctx)]);
   const hits = findMentioned(question, records);
   const kind = askKind(question);
   const named = hits.length > 0 && hits[0].strength === "strong";
@@ -257,7 +251,7 @@ export async function lookup(ctx: Context, question: string): Promise<LookupResu
   if (namedLeads.length) return { kind: "propertyLeads", leads: namedLeads.slice(0, DETAILED).map((l) => leadView(l, ctx.me)) };
 
   if (!named && kind === "summary") {
-    const relevant = records.filter(hasRequirement);
+    const relevant = (await allPeople(ctx.monday, ctx.accountSlug)).filter(hasRequirement);
     return { kind: "summary", ...(await summarize(claude(), question, relevant, todayInNewJersey())) };
   }
   if (!named && kind === "property") return propertySearch(ctx, question);
