@@ -1,5 +1,6 @@
 import type { MondayClient } from "./client";
 import type { PersonBoard } from "./boards";
+import { pointOf, type MapPoint } from "./properties";
 
 // A Lead or Contact as the app sees it: identity fields for matching, owners
 // for permission checks, and current values for the approval screen.
@@ -16,6 +17,7 @@ export interface PersonRecord {
   coBrokerIds: string[];
   contactBrokerNames: string;
   current: Record<RequirementField, string>;
+  desiredPoint?: MapPoint | null; // Desired Location on the map, when Monday has it
 }
 
 export type RequirementField =
@@ -80,6 +82,7 @@ export function toPersonRecord(board: PersonBoard, item: RawItem, accountSlug: s
     contactBrokerIds: personIds(col(c.contactBroker)?.value ?? null),
     coBrokerIds: personIds(col(c.coBrokers)?.value ?? null),
     contactBrokerNames: text(c.contactBroker),
+    desiredPoint: pointOf(col(c.desiredLocation)?.value),
     current: {
       contactType: text(c.contactType),
       propertyType: text(c.propertyType),
@@ -144,10 +147,40 @@ async function readItems(monday: MondayClient, board: PersonBoard, accountSlug: 
   return items.map((item) => toPersonRecord(board, item, accountSlug));
 }
 
-// Every record on the board. Slow on the live boards (about 10 seconds for
-// Leads and Contacts together), so only summaries use it.
-export function loadPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string): Promise<PersonRecord[]> {
-  return readItems(monday, board, accountSlug);
+const IDS_QUERY = `
+  query ($board: ID!) { boards(ids: [$board]) { items_page(limit: 500) { cursor items { id } } } }`;
+const NEXT_IDS_QUERY = `
+  query ($cursor: String!) { next_items_page(limit: 500, cursor: $cursor) { cursor items { id } } }`;
+const ITEMS_BY_IDS = `
+  query ($ids: [ID!], $columns: [String!]) {
+    items(ids: $ids, limit: 100) { id name updated_at column_values(ids: $columns) { id text value } }
+  }`;
+const BATCH = 100;
+const PARALLEL = 15;
+
+// Every record on the board. Monday pages through a board 500 items at a
+// time, one page after another, which took 13 seconds for live Leads. Ids
+// alone page quickly, and the records are then read 100 at a time in
+// parallel (up to 15 requests at once): about 5 seconds. Only summaries
+// read whole boards.
+export async function loadPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string): Promise<PersonRecord[]> {
+  type IdPage = { cursor: string | null; items: { id: string }[] };
+  let page = (await monday.query<{ boards: { items_page: IdPage }[] }>(IDS_QUERY, { board: board.boardId })).boards[0].items_page;
+  const ids = page.items.map((i) => i.id);
+  while (page.cursor) {
+    page = (await monday.query<{ next_items_page: IdPage }>(NEXT_IDS_QUERY, { cursor: page.cursor })).next_items_page;
+    ids.push(...page.items.map((i) => i.id));
+  }
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += BATCH) batches.push(ids.slice(i, i + BATCH));
+  const columns = Object.values(board.columns);
+  const items: RawItem[] = [];
+  for (let i = 0; i < batches.length; i += PARALLEL) {
+    const read = await Promise.all(batches.slice(i, i + PARALLEL).map((chunk) =>
+      monday.query<{ items: RawItem[] }>(ITEMS_BY_IDS, { ids: chunk, columns })));
+    for (const r of read) items.push(...r.items);
+  }
+  return items.map((item) => toPersonRecord(board, item, accountSlug));
 }
 
 // What to ask Monday for: words found in a name or business name, phone
@@ -163,12 +196,24 @@ export interface SearchTerms {
 // candidates only: the app's own matching rules then decide what counts, so
 // the terms must cover everything those rules could match.
 export function searchPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string, terms: SearchTerms): Promise<PersonRecord[]> {
-  const rule = (column_id: string, values: string[]) => ({ column_id, compare_value: values, operator: "contains_text" as const });
-  const rules = [
-    ...(terms.words.length ? [rule("name", terms.words), rule(board.columns.businessName, terms.words)] : []),
-    ...(terms.phones.length ? [rule(board.columns.phone, terms.phones)] : []),
-    ...(terms.emails.length ? [rule(board.columns.email, terms.emails)] : []),
-  ];
+  return recordsContaining(monday, board, accountSlug, [
+    { column: "name", values: terms.words },
+    { column: board.columns.businessName, values: terms.words },
+    { column: board.columns.phone, values: terms.phones },
+    { column: board.columns.email, values: terms.emails },
+  ]);
+}
+
+// Records where any of the columns contains any of its values (any case, any
+// part of a word). Columns with no values are left out of the search.
+export function recordsContaining(
+  monday: MondayClient,
+  board: PersonBoard,
+  accountSlug: string,
+  wanted: { column: string; values: string[] }[],
+): Promise<PersonRecord[]> {
+  const rules = wanted.filter((w) => w.values.length)
+    .map((w) => ({ column_id: w.column, compare_value: w.values, operator: "contains_text" as const }));
   // No rules would mean the whole board.
   if (!rules.length) return Promise.resolve([]);
   return readItems(monday, board, accountSlug, { operator: "or", rules });

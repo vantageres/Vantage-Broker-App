@@ -16,7 +16,7 @@ const Summary = z.object({
   nothing_found: z.boolean().describe("True when no record answers the question"),
 });
 
-const SYSTEM = `You answer questions that commercial real estate brokers at Vantage ask about their Leads and Contacts in Monday.com. You are given every record as one line, with an id like R12.
+const SYSTEM = `You answer questions that commercial real estate brokers at Vantage ask about their Leads and Contacts in Monday.com. You are given the records that could answer the question, one per line, each with an id like R12. When the question names a property type or a place, only records that mention it are given.
 
 Rules:
 - Use only what the records say. Never add facts, estimates or advice.
@@ -34,6 +34,7 @@ export interface SummaryPoint {
 export interface SummaryAnswer {
   points: SummaryPoint[];
   recordsRead: number;
+  scope: string; // what was read, for the screen: "the 48 Leads and Contacts that mention industrial"
 }
 
 const field = (label: string, value: string) => (value.trim() ? `${label}: ${value.trim()}` : "");
@@ -49,7 +50,7 @@ export function recordLine(r: PersonRecord, ref: string): string {
   ].filter(Boolean).join(" | ");
 }
 
-export async function summarize(client: Anthropic, question: string, records: PersonRecord[], today: string): Promise<SummaryAnswer> {
+export async function summarize(client: Anthropic, question: string, records: PersonRecord[], today: string, scope: string): Promise<SummaryAnswer> {
   const refs = new Map(records.map((r, i) => [`R${i + 1}`, r]));
   const lines = [...refs].map(([ref, r]) => recordLine(r, ref)).join("\n");
   const response = await client.beta.messages.parse({
@@ -64,7 +65,7 @@ export async function summarize(client: Anthropic, question: string, records: Pe
   if (response.stop_reason === "refusal") throw new Error("Claude declined to summarize this.");
   const parsed = response.parsed_output;
   if (!parsed) throw new Error(`Claude did not return a readable summary (stop reason: ${response.stop_reason}).`);
-  return { points: cite(parsed, refs), recordsRead: records.length };
+  return { points: cite(parsed, refs), recordsRead: records.length, scope };
 }
 
 // Keeps only points that cite at least one real record.

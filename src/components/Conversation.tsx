@@ -29,7 +29,7 @@ type Entry =
   | { id: number; kind: "property"; hit: PropertyHit }
   | { id: number; kind: "lead"; lead: PropertyLeadView }
   | { id: number; kind: "attach"; photos: ShrunkPhoto[]; candidates: AttachCandidate[] }
-  | { id: number; kind: "summary"; points: SummaryPoint[]; recordsRead: number };
+  | { id: number; kind: "summary"; points: SummaryPoint[]; scope: string };
 
 type Listed = { name: string; url: string; boardLabel: string };
 
@@ -198,8 +198,8 @@ export function Conversation({ firstName }: { firstName: string }) {
 
       if (result.kind === "summary") {
         done(result.points.length
-          ? { id: nextId++, kind: "summary", points: result.points, recordsRead: result.recordsRead }
-          : { id: nextId++, kind: "app", text: `No Lead or Contact in Monday answers that. I read all ${result.recordsRead} with requirements.`, asNote: question });
+          ? { id: nextId++, kind: "summary", points: result.points, scope: result.scope }
+          : { id: nextId++, kind: "app", text: `No Lead or Contact in Monday answers that. I read ${result.scope}.`, asNote: question });
         return;
       }
 
@@ -287,7 +287,7 @@ export function Conversation({ firstName }: { firstName: string }) {
             case "attach":
               return <AttachCard key={entry.id} photos={entry.photos} candidates={entry.candidates} />;
             case "summary":
-              return <SummaryCard key={entry.id} points={entry.points} recordsRead={entry.recordsRead} />;
+              return <SummaryCard key={entry.id} points={entry.points} scope={entry.scope} />;
             case "proposal":
               return <ProposalCard key={entry.id} proposal={entry.proposal} photos={entry.photos} attachByDefault={entry.attachByDefault} onReplace={(p) => replace(entry.id, p)} />;
           }

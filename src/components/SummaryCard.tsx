@@ -3,13 +3,13 @@ import { Out } from "./icons";
 
 // A summary across Leads and Contacts. Every point links to the records it
 // comes from; points without a source never reach the screen.
-export function SummaryCard({ points, recordsRead }: { points: SummaryPoint[]; recordsRead: number }) {
+export function SummaryCard({ points, scope }: { points: SummaryPoint[]; scope: string }) {
   return (
     <article className="card lookup" aria-label="Summary">
       <div className="card-head">
         <div>
           <div className="title">Summary</div>
-          <div className="inline-msg">From {recordsRead} Leads and Contacts with requirements, read from Monday just now.</div>
+          <div className="inline-msg">From {scope}, read from Monday just now.</div>
         </div>
         <span className="chip">SUMMARY</span>
       </div>

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
-import { loadPersonRecord, loadPersonRecords, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
+import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms } from "../matching";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
@@ -12,7 +12,8 @@ import type { MapPoint } from "../monday/properties";
 import { findMentioned, questionTerms } from "../lookup/search";
 import { lookupAnswer, type LookupAnswer } from "../lookup/details";
 import { askKind, asksForListings } from "../lookup/question";
-import { summarize, type SummaryPoint } from "../lookup/summary";
+import { summarize, type SummaryAnswer, type SummaryPoint } from "../lookup/summary";
+import { describeScope, mentionsType, nearPlace, placeAsked, typesAsked, type TypeAsked } from "../lookup/narrow";
 import { LIVE_PROPERTY_BOARDS, TEST_PROPERTY_BOARDS, loadProperties } from "../monday/properties";
 import { LIVE_PROPERTY_LEADS, TEST_PROPERTY_LEADS, findLeads, leadView, loadPropertyLeads, type PropertyLeadRecord, type PropertyLeadView } from "../property-leads/board";
 import { describeQuery, hasFilters, knownTowns, queryFromRequirement, readQuery, searchProperties, type PropertyHit } from "../property/search";
@@ -168,7 +169,7 @@ export type LookupResult =
         elsewhere: boolean; // nothing fit in that town, so these are from anywhere
       };
     }
-  | { kind: "summary"; points: SummaryPoint[]; recordsRead: number }
+  | { kind: "summary"; points: SummaryPoint[]; recordsRead: number; scope: string }
   | { kind: "propertyLeads"; leads: PropertyLeadView[] };
 
 const DETAILED = 3;
@@ -233,9 +234,40 @@ async function listingsFor(ctx: Context, record: PersonRecord): Promise<LookupRe
   };
 }
 
-// Records with something to summarize: any requirement detail at all.
+// Records with something to summarize: any requirement detail at all. A
+// Contact Type of "Not Set" or "Not Labeled" says nothing.
 const hasRequirement = (r: PersonRecord) =>
-  ["contactType", "propertyType", "size", "budget", "desiredLocation", "notes"].some((k) => r.current[k as keyof PersonRecord["current"]]?.trim());
+  ["propertyType", "size", "budget", "desiredLocation", "notes"].some((k) => r.current[k as keyof PersonRecord["current"]]?.trim())
+  || !/^(not set|not labeled)?$/i.test(r.current.contactType.trim());
+
+// Leads and Contacts that mention a property type, found by Monday's search
+// (Property Type, Notes or Business Name) instead of reading the boards.
+async function peopleMentioning(monday: MondayClient, accountSlug: string, types: TypeAsked[]): Promise<PersonRecord[]> {
+  const words = [...new Set(types.flatMap((t) => [t.label.toLowerCase(), ...t.words]))];
+  return (await Promise.all(Object.values(BOARDS).map((b) => recordsContaining(monday, b, accountSlug, [
+    { column: b.columns.propertyType, values: types.map((t) => t.label.toLowerCase()) },
+    { column: b.columns.notes, values: words },
+    { column: b.columns.businessName, values: words },
+  ])))).flat();
+}
+
+// A summary across Leads and Contacts, sent only the records that could
+// answer it (see lookup/narrow.ts).
+async function summaryFor(ctx: Context, question: string): Promise<SummaryAnswer> {
+  const types = typesAsked(question);
+  // A place narrows only when no type does (see lookup/narrow.ts).
+  const [found, place] = await Promise.all([
+    types.length ? peopleMentioning(ctx.monday, ctx.accountSlug, types) : allPeople(ctx.monday, ctx.accountSlug),
+    types.length ? null : placeAsked(question, geocoder()),
+  ]);
+  const records = found
+    .filter(hasRequirement)
+    .filter((r) => !types.length || mentionsType(r, types))
+    .filter((r) => !place || nearPlace(r, place));
+  const scope = describeScope(records.length, types, place);
+  if (!records.length) return { points: [], recordsRead: 0, scope };
+  return summarize(claude(), question, records, todayInNewJersey(), scope);
+}
 
 // Lookups read Monday when asked: only the records the question could name.
 export async function lookup(ctx: Context, question: string): Promise<LookupResult> {
@@ -251,8 +283,7 @@ export async function lookup(ctx: Context, question: string): Promise<LookupResu
   if (namedLeads.length) return { kind: "propertyLeads", leads: namedLeads.slice(0, DETAILED).map((l) => leadView(l, ctx.me)) };
 
   if (!named && kind === "summary") {
-    const relevant = (await allPeople(ctx.monday, ctx.accountSlug)).filter(hasRequirement);
-    return { kind: "summary", ...(await summarize(claude(), question, relevant, todayInNewJersey())) };
+    return { kind: "summary", ...(await summaryFor(ctx, question)) };
   }
   if (!named && kind === "property") return propertySearch(ctx, question);
   // Nothing named, but the question reads as a property search ("Any retail in Haddonfield?").

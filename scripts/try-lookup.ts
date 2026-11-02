@@ -34,7 +34,7 @@ if (result.kind === "properties") {
   }
   for (const m of result.more) console.log(`  also: ${m.name}`);
 } else if (result.kind === "summary") {
-  console.log(`Summary from ${result.recordsRead} records (${ms} ms)`);
+  console.log(`Summary from ${result.scope} (${ms} ms)`);
   for (const p of result.points) console.log(`- ${p.text} [${p.sources.map((s) => s.name).join(", ")}]`);
 } else if (result.kind === "propertyLeads") {
   console.log(`Property Leads: ${result.leads.length} (${ms} ms)`);

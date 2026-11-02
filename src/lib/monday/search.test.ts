@@ -30,6 +30,8 @@ function fakeMonday(board: PersonBoard, items: FakeItem[], log: unknown[] = []):
     column === "name" ? item.name : item.column_values.find((v) => v.id === column)?.text ?? "";
   return {
     async query<T>(_q: string, variables: Record<string, unknown> = {}): Promise<T> {
+      // A full read asks for ids first, then the records by id.
+      if (Array.isArray(variables.ids)) return { items: raw.filter((item) => (variables.ids as string[]).includes(item.id)) } as T;
       const query = variables.query as { rules: { column_id: string; compare_value: string[] }[] } | undefined;
       log.push(query);
       const kept = query
@@ -133,5 +135,22 @@ describe("questionTerms", () => {
   it("finds nothing when the question names no one", async () => {
     const candidates = await searchPersonRecords(fakeMonday(board, PEOPLE), board, "x", questionTerms("Who is Zelda Quinn at Acme?"));
     expect(ids(candidates)).toEqual([]);
+  });
+});
+
+describe("loadPersonRecords", () => {
+  it("reads every record, at most 100 at a time", async () => {
+    const many = Array.from({ length: 250 }, (_, i) => ({ name: `Person ${i + 1}` }));
+    const sizes: number[] = [];
+    const monday = fakeMonday(board, many);
+    const counting: MondayClient = {
+      query: (q, v = {}) => {
+        if (Array.isArray(v.ids)) sizes.push(v.ids.length);
+        return monday.query(q, v);
+      },
+    };
+    const records = await loadPersonRecords(counting, board, "x");
+    expect(records.map((r) => r.name)).toEqual(many.map((m) => m.name));
+    expect(sizes).toEqual([100, 100, 50]);
   });
 });
