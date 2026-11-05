@@ -26,6 +26,14 @@ Rules:
 - Read sizes and budgets carefully: "15,000 to 20,000 sf" is under 20k sf only if the whole range is. When a record's value is unclear or missing, say so in its point rather than guessing.
 - If no record answers the question, set nothing_found to true and return no points.`;
 
+// Claude declined, or its answer couldn't be read. The message is for the log;
+// the broker sees a plain sentence (see failure.ts).
+export class SummaryProblem extends Error {
+  constructor(readonly why: "declined" | "unreadable", message: string) {
+    super(message);
+  }
+}
+
 export interface SummaryPoint {
   text: string;
   sources: { board: "leads" | "contacts"; boardLabel: string; id: string; name: string; url: string }[];
@@ -62,9 +70,9 @@ export async function summarize(client: Anthropic, question: string, records: Pe
     system: SYSTEM,
     messages: [{ role: "user", content: `Today is ${today}.\n\nRecords:\n${lines}\n\nQuestion: ${question}` }],
   });
-  if (response.stop_reason === "refusal") throw new Error("Claude declined to summarize this.");
+  if (response.stop_reason === "refusal") throw new SummaryProblem("declined", "Claude declined to summarize this.");
   const parsed = response.parsed_output;
-  if (!parsed) throw new Error(`Claude did not return a readable summary (stop reason: ${response.stop_reason}).`);
+  if (!parsed) throw new SummaryProblem("unreadable", `Claude did not return a readable summary (stop reason: ${response.stop_reason}).`);
   return { points: cite(parsed, refs), recordsRead: records.length, scope };
 }
 

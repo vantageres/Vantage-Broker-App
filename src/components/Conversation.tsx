@@ -226,7 +226,11 @@ export function Conversation({ firstName }: { firstName: string }) {
         ...(more.length ? [{ id: nextId++, kind: "app" as const, text: "Also matching:", more }] : []),
       );
     } catch (err) {
-      done({ id: nextId++, kind: "app", text: (err as Error).message, retry: question });
+      // The browser couldn't reach the server at all (no signal, offline).
+      const text = err instanceof TypeError
+        ? "I couldn't answer that: the app couldn't reach the server. Check your connection and try again."
+        : (err as Error).message;
+      done({ id: nextId++, kind: "app", text, retry: question });
     }
   }
 
