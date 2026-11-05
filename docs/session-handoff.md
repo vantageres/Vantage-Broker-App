@@ -62,5 +62,5 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - Vantage domain: brokers.vantageres.com set up Nov 5 (see "Where things stand"). Sign-in works there (Nov 5). Optionally redirect the old vercel.app address to it in Vercel → Domains.
-12. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Works end to end on the test boards. John to try on the live site with one of his own Leads: "Qualify <name>", answer any questions, approve, and check it lands in Contacts with Business Name and Files.
+12. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Works end to end on the test boards. John to try again on the live site after reloading: "Qualify Kristin Smyth" (her required fields are now filled), then check she lands in Contacts with Business Name and Files. The first try ran an out-of-date page (see "Version check" in `build-plan.md`).
 13. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).

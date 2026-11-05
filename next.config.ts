@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Built into both browser and server code, so the server can tell when an
+  // open page is running an older version (see src/lib/version.ts).
+  env: { APP_VERSION: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "dev" },
   async headers() {
     return [
       {

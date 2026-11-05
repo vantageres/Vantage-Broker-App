@@ -252,3 +252,6 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .more-list a { font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
 .link-btn { margin-top: 6px; min-height: 36px; padding: 0; border: 0; background: none; color: var(--navy); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .link-btn:disabled { color: var(--faint); cursor: default; }
+
+/* Shown when a new version of the app has been deployed while this page was open. */
+.update-banner { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 12px; right: 12px; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12); font-size: 14px; font-weight: 600; color: var(--navy); }
