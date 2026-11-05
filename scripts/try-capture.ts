@@ -101,6 +101,10 @@ function print(p: Proposal) {
     const more = p.questions.length - 1;
     console.log(`Question: ${p.questions[0].question}${more ? `  (${more} more after this)` : ""}`);
   }
+  if (p.qualify?.state === "ready") {
+    const missing = p.qualify.required.filter((r) => !r.current && !p.changes.some((c) => c.field === r.field)).map((r) => r.label);
+    console.log(missing.length ? `Qualify: asks for ${missing.join(", ")} first` : `Qualify: Status ${p.qualify.currentStatus || "empty"} -> Qualified`);
+  } else if (p.qualify) console.log(`Qualify: not possible (${p.qualify.state})`);
   for (const a of p.automations) console.log(`Automation: ${a}`);
   if (!p.blocked && t.kind !== "pick") console.log(`Broker Note to save: "${p.noteText}"`);
 }

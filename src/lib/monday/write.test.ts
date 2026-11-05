@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TEST_BOARDS } from "./boards";
 import type { MondayClient } from "./client";
-import { checkPhotos, claimRecord, columnValue, saveProposal, SaveRefused } from "./write";
+import { checkPhotos, claimRecord, columnValue, NoteNotSaved, saveProposal, SaveRefused } from "./write";
 
 const ME = { id: "1", name: "John Smyth" };
 
@@ -189,5 +189,73 @@ describe("linking a sign's property", () => {
     await expect(saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "x", linkProperty: "555" }, { linkableBoardId: OLD }))
       .rejects.toThrow("old Properties board");
     expect(mutations).toEqual([]);
+  });
+});
+
+describe("qualifying", () => {
+  // Answers owner reads with John as Contact Broker, and the qualify check with these values.
+  function qualifyMonday(values: Record<string, string>, failStatus = false) {
+    const mutations: { query: string; vars: Record<string, unknown> }[] = [];
+    const client: MondayClient = {
+      async query<T>(query: string, vars: Record<string, unknown> = {}) {
+        if (query.trim().startsWith("mutation")) {
+          if (failStatus && String(vars.values ?? "").includes("Qualified")) throw new Error("Monday is down");
+          mutations.push({ query, vars });
+          return {} as T;
+        }
+        const cols = vars.cols as string[];
+        if (cols.includes("person")) {
+          return { items: [{ name: "Linda Park", board: { id: TEST_BOARDS.leads.boardId }, column_values: [
+            { id: "person", text: "John Smyth", value: JSON.stringify({ personsAndTeams: [{ id: 1, kind: "person" }] }) },
+            { id: "people", text: "", value: null },
+          ] }] } as T;
+        }
+        return { items: [{ column_values: cols.map((id) => ({ id, text: values[id] ?? "" })) }] } as T;
+      },
+    };
+    return { client, mutations };
+  }
+  const c = TEST_BOARDS.leads.columns;
+  const full = { [c.status!]: "Contacted", [c.email]: "linda@parkmedical.example", [c.phone]: "8565550175", [c.propertyType]: "Healthcare", [c.source]: "Referral", [c.contactType]: "Leasee" };
+
+  it("sets Status to Qualified last, after the fields and the note", async () => {
+    const { client, mutations } = qualifyMonday(full);
+    const result = await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "size", value: "4,000 sf" }], noteText: "Qualify Linda", qualify: true });
+    expect(result).toMatchObject({ qualified: true, noteAdded: true });
+    expect(mutations.map((m) => (m.query.includes("create_timeline_item") ? "note" : JSON.parse(m.vars.values as string)))).toEqual([
+      { [c.size]: "4,000 sf" },
+      "note",
+      { [c.status!]: { label: "Qualified" } },
+    ]);
+  });
+
+  it("counts a required field the save fills", async () => {
+    const { client, mutations } = qualifyMonday({ ...full, [c.email]: "" });
+    await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "email", value: "linda@new.example" }], noteText: "", qualify: true });
+    expect(mutations.at(-1)!.vars.values).toContain("Qualified");
+  });
+
+  it("refuses before writing anything when a required field is empty", async () => {
+    const { client, mutations } = qualifyMonday({ ...full, [c.phone]: "", [c.contactType]: "Not Set" });
+    await expect(saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "size", value: "4,000 sf" }], noteText: "x", qualify: true }))
+      .rejects.toThrow("Linda Park can't be qualified yet: Phone, Contact Type are empty. Nothing was saved.");
+    expect(mutations).toEqual([]);
+  });
+
+  it("refuses a Lead that is already Qualified, a Contact, and a new Lead", async () => {
+    await expect(saveProposal(qualifyMonday({ ...full, [c.status!]: "Qualified" }).client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "", qualify: true }))
+      .rejects.toThrow("Linda Park is already Qualified.");
+    await expect(saveProposal(qualifyMonday(full).client, TEST_BOARDS, ME, { target: { ...existing, board: "contacts" }, changes: [], noteText: "", qualify: true }))
+      .rejects.toThrow(SaveRefused);
+    await expect(saveProposal(qualifyMonday(full).client, TEST_BOARDS, ME, { target: { kind: "new-lead" }, changes: [{ field: "name", value: "Zelda" }], noteText: "", qualify: true }))
+      .rejects.toThrow("Save the new Lead first, then qualify it.");
+  });
+
+  it("reports a save whose Status step failed, so a retry sets only Qualified", async () => {
+    const { client } = qualifyMonday(full, true);
+    const error = await saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "size", value: "4,000 sf" }], noteText: "x", qualify: true }).catch((e) => e);
+    expect(error).toBeInstanceOf(NoteNotSaved);
+    expect(error.message).toBe("The changes were saved, but Status wasn't set to Qualified.");
+    expect(error.result).toMatchObject({ noteAdded: true, qualified: false, fieldsChanged: 1 });
   });
 });

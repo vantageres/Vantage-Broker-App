@@ -204,7 +204,14 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   const totalQuestions = proposal.questions.filter((q) => q.field !== "match").length;
   const missingMap = rowFields.some((f) => MAP_FIELDS.has(f) && !valueOf(f)?.location);
   const attaching = attach ? photos.map(({ data, mediaType }) => ({ data, mediaType })) : [];
-  const changeCount = rowFields.length + (notesAdded ? 1 : 0);
+  // Qualifying: every required field must have a value, from the record, a
+  // proposed change, an answer or an edit. A skipped one means not yet.
+  const q = proposal.qualify;
+  const qualifyMissing = q?.state === "ready"
+    ? q.required.filter((r) => !r.current && !valueOf(r.field)?.value.trim())
+    : [];
+  const qualifying = q?.state === "ready" && qualifyMissing.length === 0;
+  const changeCount = rowFields.length + (notesAdded ? 1 : 0) + (qualifying ? 1 : 0);
 
   function setEdit(field: string, edit: Edit) {
     setEdits((e) => ({ ...e, [field]: edit }));
@@ -226,7 +233,11 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     }
     if (notesAdded.trim()) changes.push({ field: "notes", value: notesKept ? `${notesKept.replace(/[.;\s]+$/, "")}. ${notesAdded.trim()}` : notesAdded.trim() });
     const target: SaveRequest["target"] = t.kind === "existing" ? { kind: "existing", board: t.record.board, id: t.record.id } : { kind: "new-lead" };
-    return { target, changes, noteText: proposal.noteText, photos: attaching, ...(sign?.linkable && linkSign ? { linkProperty: sign.id } : {}) };
+    return {
+      target, changes, noteText: proposal.noteText, photos: attaching,
+      ...(sign?.linkable && linkSign ? { linkProperty: sign.id } : {}),
+      ...(qualifying ? { qualify: true } : {}),
+    };
   }
 
   async function save(request: SaveRequest) {
@@ -243,13 +254,14 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   function retry() {
     if (status.kind !== "failed") return;
     if (status.partial) {
-      // Fields are already saved; only the note is retried.
-      // Only what's missing: photos not yet attached, then the note.
+      // Fields are already saved. Only what's missing: photos not yet
+      // attached, the note if it wasn't added, then Qualified.
       save({
         target: { kind: "existing", board: status.partial.board, id: status.partial.itemId },
         changes: [],
-        noteText: proposal.noteText,
+        noteText: status.partial.noteAdded ? "" : proposal.noteText,
         photos: attaching.slice(status.partial.photosAttached),
+        ...(qualifying && !status.partial.qualified ? { qualify: true } : {}),
       });
     } else save(saveRequest());
   }
@@ -259,7 +271,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
 
   if (status.kind === "saved") {
     const r = status.result;
-    const parts = [r.fieldsChanged ? `${r.fieldsChanged} field${r.fieldsChanged === 1 ? "" : "s"} updated` : "", r.photosAttached ? `${r.photosAttached === 1 ? "a photo" : `${r.photosAttached} photos`} attached` : "", r.noteAdded ? "a note added" : ""].filter(Boolean);
+    const parts = [r.fieldsChanged ? `${r.fieldsChanged} field${r.fieldsChanged === 1 ? "" : "s"} updated` : "", r.photosAttached ? `${r.photosAttached === 1 ? "a photo" : `${r.photosAttached} photos`} attached` : "", r.noteAdded ? "a note added" : "", r.qualified ? "Status set to Qualified" : ""].filter(Boolean);
     return (
       <>
         <div className="card" style={{ padding: "12px 16px", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -273,6 +285,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
           <span className="tick"><Check /></span>
           <div>
             <div><strong>Saved to {r.name}.</strong> {parts.length ? `${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.` : ""}</div>
+            {r.qualified && <div>Monday&apos;s automation moves {r.name} to Contacts in a few seconds.</div>}
             <a className="open" href={status.url} target="_blank" rel="noreferrer">Open in Monday <Out /></a>
           </div>
         </div>
@@ -362,6 +375,27 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
         />
       )}
 
+      {q?.state === "ready" && (qualifying ? (
+        <div className="callout auto"><Check /><span><strong>Status: {q.currentStatus || "empty"} → Qualified.</strong> Set after the other changes and the note are saved.</span></div>
+      ) : !question && (
+        <div className="callout notes">
+          <span>
+            <strong>Not qualified yet:</strong> {qualifyMissing.map((r) => r.label).join(", ")} {qualifyMissing.length === 1 ? "is" : "are"} still empty, and the move to Contacts needs {qualifyMissing.length === 1 ? "it" : "them"}. Add {qualifyMissing.length === 1 ? "it" : "them"} to qualify, or approve to save the other changes only.
+            {qualifyMissing.some((r) => r.field === editing) ? (
+              <FieldEditor field={editing!} initial={{ value: "" }} onCancel={() => setEditing(null)} onDone={(edit) => { setEdit(editing!, edit); setEditing(null); }} />
+            ) : (
+              <span style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {qualifyMissing.map((r) => (
+                  <button key={r.field} className="small-btn" disabled={working} onClick={() => setEditing(r.field)}>Add {r.label}</button>
+                ))}
+              </span>
+            )}
+          </span>
+        </div>
+      ))}
+      {q?.state === "contact" && <div className="callout notes"><strong>Already a Contact.</strong> Only Leads are qualified, so there&apos;s nothing to move.</div>}
+      {q?.state === "already" && <div className="callout notes"><strong>Already Qualified.</strong> This Lead&apos;s Status is Qualified, so Monday should have moved it to Contacts. Check it in Monday.</div>}
+      {q?.state === "new-lead" && <div className="callout notes"><strong>Not in Monday yet.</strong> Save the new Lead first, then ask me to qualify them.</div>}
       {proposal.placedInNotes.map((n, i) => (
         <div className="callout notes" key={i}><strong>Put in Notes:</strong> “{n.text}” {n.why}</div>
       ))}
@@ -420,7 +454,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
                 ? `Answer ${openQuestions.length} question${openQuestions.length === 1 ? "" : "s"} to approve`
                 : missingMap
                   ? "Find Desired Location on the map first"
-                  : "Approve & save"}
+                  : qualifying ? "Approve, save & qualify" : "Approve & save"}
           </button>
         )}
         <button className="secondary" disabled={working} onClick={() => setStatus({ kind: "cancelled" })}>Cancel</button>

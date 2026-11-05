@@ -2,6 +2,7 @@ import { normalizePhone, splitEmails, type PersonRecord, type RequirementField }
 import { findMatches, type MatchCandidate, type MatchResult } from "../matching";
 import type { ExtractedPerson, UNCERTAIN_FIELDS } from "./extract";
 import type { SignProperty } from "../property/near";
+import { QUALIFY_REQUIRED } from "../monday/boards";
 
 // What a photo adds beyond the person: lines for Notes (a sign's listing),
 // the Source for a new Lead, and the property a sign was found at. Kept on the
@@ -87,12 +88,29 @@ export interface Proposal {
   // instead of silently replacing it.
   currentPropertyType?: string;
   extra?: ProposalExtra;
+  qualify?: QualifyInfo;
 }
 
 export interface Broker {
   id: string;
   name: string;
 }
+
+// The broker asked to qualify the person. Only a Lead the broker owns can be
+// qualified: setting its Status to Qualified starts the Monday automation that
+// moves it to Contacts, and that automation needs every required field.
+export type QualifyInfo =
+  | {
+      state: "ready";
+      currentStatus: string;
+      // Each required field with its value on the record ("" when empty). The
+      // approval screen checks these, plus the proposed changes and answers,
+      // before it asks to qualify.
+      required: { field: (typeof QUALIFY_REQUIRED)[number]; label: string; current: string }[];
+    }
+  | { state: "contact" } // already a Contact
+  | { state: "new-lead" } // not in Monday yet: save the Lead first
+  | { state: "already" }; // the Lead's Status is already Qualified
 
 const LABELS: Record<string, string> = {
   name: "Name",
@@ -266,6 +284,7 @@ export function proposalFor(
   }
 
   if (!record) {
+    if (person.qualify) Object.assign(base, { qualify: { state: "new-lead" } satisfies QualifyInfo });
     // A new Lead from a sign: Source says so. An existing record's Source,
     // how the broker first met them, is left as it is.
     if (extra?.sourceForNew && !values.source) values.source = extra.sourceForNew;
@@ -310,6 +329,26 @@ export function proposalFor(
   }
 
   const automations: string[] = [];
+  let qualify: QualifyInfo | undefined;
+  if (person.qualify) {
+    if (record.board.key === "contacts") qualify = { state: "contact" };
+    else if (record.current.status.trim().toLowerCase() === "qualified") qualify = { state: "already" };
+    else {
+      const required = QUALIFY_REQUIRED.map((field) => ({
+        field,
+        label: LABELS[field],
+        current: unset.has(record.current[field].trim().toLowerCase()) ? "" : record.current[field],
+      }));
+      qualify = { state: "ready", currentStatus: record.current.status, required };
+      // Ask for each required field that is still empty, one at a time, unless
+      // a question about it is already waiting.
+      for (const r of required) {
+        if (r.current || values[r.field] || openQuestions.some((q) => q.field === r.field)) continue;
+        openQuestions.push({ field: r.field, question: `To qualify ${record.name}, I need their ${r.label.toLowerCase()}. What is it?` });
+      }
+      automations.push(`Setting Status to Qualified starts the Monday automation that moves ${record.name} from Leads to Contacts.`);
+    }
+  }
   if (record.board.key === "contacts") {
     automations.push("Saving a note on a Contact starts the Monday automation that moves Follow Up Date about six months out.");
   } else {
@@ -320,6 +359,7 @@ export function proposalFor(
   return {
     ...base, target, changes: diff(values, record), questions: openQuestions, automations,
     currentPropertyType: record.current.propertyType || undefined,
+    ...(qualify ? { qualify } : {}),
   };
 }
 

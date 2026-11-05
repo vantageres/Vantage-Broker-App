@@ -1,6 +1,6 @@
 import type { MondayClient } from "./client";
 import type { Photo } from "../capture/extract";
-import { BROKER_NOTE_ACTIVITY_ID, CONTACT_TYPES, PROPERTY_TYPES, SOURCES, type PersonBoard } from "./boards";
+import { BROKER_NOTE_ACTIVITY_ID, CONTACT_TYPES, PROPERTY_TYPES, QUALIFY_REQUIRED, SOURCES, type PersonBoard } from "./boards";
 
 // Writes an approved proposal to Monday. Every check that protects a record
 // (ownership, a claim race, value formats) happens here, on the server, just
@@ -25,6 +25,9 @@ export interface SaveRequest {
   // A property on the old Properties board to add to Associated Properties
   // (the property a sign stands at).
   linkProperty?: string;
+  // Set the Lead's Status to Qualified after everything else is saved, which
+  // starts the Monday automation that moves it to Contacts.
+  qualify?: boolean;
 }
 
 export interface SaveOptions {
@@ -59,8 +62,12 @@ export interface Me {
 // only what's missing (`result.photosAttached` says how many photos made it),
 // to the record in `result`.
 export class NoteNotSaved extends Error {
-  constructor(readonly result: SaveResult, what: "note" | "photo") {
-    super(what === "photo" ? "The changes were saved, but the photo wasn't attached." : "The changes were saved, but the note wasn't added.");
+  constructor(readonly result: SaveResult, what: "note" | "photo" | "qualify") {
+    super(
+      what === "photo" ? "The changes were saved, but the photo wasn't attached."
+        : what === "qualify" ? "The changes were saved, but Status wasn't set to Qualified."
+          : "The changes were saved, but the note wasn't added.",
+    );
   }
 }
 
@@ -191,6 +198,32 @@ export interface SaveResult {
   fieldsChanged: number;
   noteAdded: boolean;
   photosAttached: number;
+  qualified: boolean;
+}
+
+const REQUIRED_LABELS: Record<(typeof QUALIFY_REQUIRED)[number], string> = {
+  email: "Email", phone: "Phone", propertyType: "Property Type", source: "Source", contactType: "Contact Type",
+};
+const UNSET = /^(not set|not labeled)?$/i;
+
+// Before qualifying: the record must be a Lead, not already Qualified, and
+// every field the automation needs must be filled, counting the changes about
+// to be saved. Read fresh from Monday, whatever the browser sent.
+async function checkQualify(monday: MondayClient, board: PersonBoard, itemId: string, name: string, changes: SaveChange[]) {
+  if (board.key !== "leads" || !board.columns.status) throw new SaveRefused("Only a Lead can be qualified.");
+  const columns = [board.columns.status, ...QUALIFY_REQUIRED.map((f) => board.columns[f])];
+  const data = await monday.query<{ items: { column_values: { id: string; text: string | null }[] }[] }>(
+    `query ($id: [ID!], $cols: [String!]) { items(ids: $id) { column_values(ids: $cols) { id text } } }`,
+    { id: [itemId], cols: columns },
+  );
+  const text = (id: string) => data.items[0]?.column_values.find((c) => c.id === id)?.text?.trim() ?? "";
+  if (text(board.columns.status).toLowerCase() === "qualified") throw new SaveRefused(`${name} is already Qualified.`);
+  const missing = QUALIFY_REQUIRED.filter((f) =>
+    UNSET.test(text(board.columns[f])) && !changes.some((c) => c.field === f && c.value.trim()));
+  if (missing.length) {
+    const labels = missing.map((f) => REQUIRED_LABELS[f]);
+    throw new SaveRefused(`${name} can't be qualified yet: ${labels.join(", ")} ${labels.length === 1 ? "is" : "are"} empty. Nothing was saved.`);
+  }
 }
 
 export async function saveProposal(
@@ -205,6 +238,7 @@ export async function saveProposal(
   const link = await checkLinkable(monday, request.linkProperty, options);
 
   if (request.target.kind === "new-lead") {
+    if (request.qualify) throw new SaveRefused("Save the new Lead first, then qualify it.");
     const board = boards.leads;
     const name = request.changes.find((c) => c.field === "name")?.value.trim();
     if (!name) throw new SaveRefused("A new Lead needs a name.");
@@ -223,8 +257,8 @@ export async function saveProposal(
        }`,
       { board: board.boardId, name, values: JSON.stringify(values) },
     );
-    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length + (link ? 1 : 0), noteAdded: false, photosAttached: 0 };
-    return afterFields(monday, board, result, photos, note);
+    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length + (link ? 1 : 0), noteAdded: false, photosAttached: 0, qualified: false };
+    return afterFields(monday, board, result, photos, note, false);
   }
 
   const board = boards[request.target.board];
@@ -236,6 +270,7 @@ export async function saveProposal(
     if (owners.contactBroker.length === 0) throw new SaveRefused(`${owners.name} has no Contact Broker. Claim it first.`);
     throw new SaveRefused(`${owners.name} belongs to ${owners.contactBrokerNames}.`, owners.contactBrokerNames);
   }
+  if (request.qualify) await checkQualify(monday, board, itemId, owners.name, request.changes);
 
   const values: Record<string, unknown> = {};
   for (const change of request.changes) {
@@ -255,12 +290,13 @@ export async function saveProposal(
       { board: board.boardId, item: itemId, values: JSON.stringify(values) },
     );
   }
-  const result: SaveResult = { board: board.key, itemId, name: owners.name, fieldsChanged: Object.keys(values).length, noteAdded: false, photosAttached: 0 };
-  return afterFields(monday, board, result, photos, note);
+  const result: SaveResult = { board: board.key, itemId, name: owners.name, fieldsChanged: Object.keys(values).length, noteAdded: false, photosAttached: 0, qualified: false };
+  return afterFields(monday, board, result, photos, note, !!request.qualify);
 }
 
-// After the fields: the photos to Files, then the Broker Note.
-async function afterFields(monday: MondayClient, board: PersonBoard, result: SaveResult, photos: Photo[], note: string): Promise<SaveResult> {
+// After the fields: the photos to Files, then the Broker Note, then Status =
+// Qualified last, so everything is on the Lead before Monday moves it.
+async function afterFields(monday: MondayClient, board: PersonBoard, result: SaveResult, photos: Photo[], note: string, qualify: boolean): Promise<SaveResult> {
   let done = result;
   for (const [i, photo] of photos.entries()) {
     try {
@@ -271,13 +307,26 @@ async function afterFields(monday: MondayClient, board: PersonBoard, result: Sav
     }
     done = { ...done, photosAttached: done.photosAttached + 1 };
   }
-  if (!note) return done;
-  try {
-    await addBrokerNote(monday, result.itemId, note);
-  } catch {
-    throw new NoteNotSaved(done, "note");
+  if (note) {
+    try {
+      await addBrokerNote(monday, result.itemId, note);
+    } catch {
+      throw new NoteNotSaved(done, "note");
+    }
+    done = { ...done, noteAdded: true };
   }
-  return { ...done, noteAdded: true };
+  if (!qualify) return done;
+  try {
+    await monday.query(
+      `mutation ($board: ID!, $item: ID!, $values: JSON!) {
+         change_multiple_column_values(board_id: $board, item_id: $item, column_values: $values, create_labels_if_missing: false) { id }
+       }`,
+      { board: board.boardId, item: result.itemId, values: JSON.stringify({ [board.columns.status!]: { label: "Qualified" } }) },
+    );
+  } catch {
+    throw new NoteNotSaved(done, "qualify");
+  }
+  return { ...done, qualified: true };
 }
 
 // Claiming sets the broker as Contact Broker on an unassigned record. Monday

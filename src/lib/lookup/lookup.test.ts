@@ -21,6 +21,7 @@ describe("isQuestion", () => {
     "Retail in Haddonfield around 2,000 sf",
     "Land for sale in Marlton",
     "2,000 sf retail",
+    "How many leads did we qualify this week?",
   ])("asks: %s", (t) => expect(isQuestion(t)).toBe(true));
 
   it.each([
@@ -31,6 +32,11 @@ describe("isQuestion", () => {
     "Office space tour with Dave Reyes went well, he needs 5,000 sf",
     "Industrial buyer Sam Whitaker met at the 7 Industrial Ave showing, looking at 30k sf, follow up Friday",
     "Talked to Dave, he asked whether the landlord would cover fit-out, and whether the space has a loading dock and three-phase power?",
+    "Qualify Linda Park",
+    "Please qualify Dave Reyes",
+    "Can you qualify Linda Park?",
+    "Could you move Dave Reyes to Contacts?",
+    "Mark Sam Whitaker as qualified",
     "",
   ])("notes: %s", (t) => expect(isQuestion(t)).toBe(false));
 });

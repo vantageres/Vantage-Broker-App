@@ -14,9 +14,14 @@ const SEARCH_START = /^(available|vacant|open|industrial|warehouse|flex|retail|o
 const SEARCH_WORDS = /\b(sf|sq\.?\s?ft|square f(ee|oo)t|acres?|space|suites?|listings?|propert(y|ies)|for (lease|sale)|available|vacant|industrial|warehouse|flex|retail|office|land)\b/i;
 const HAPPENED = /\b(met|meet|meeting|talked|spoke|called|call|emailed|texted|toured|tour|visited|said|says|told|wants|needs|left|follow ?up|lunch|coffee)\b/i;
 
+// Asking the app to qualify someone ("Qualify Linda Park", "Can you move Dave
+// Reyes to Contacts?") is a change to propose, not a lookup.
+const QUALIFY_ASK = /^(please\s+)?(qualify|mark\b.*\bqualified|move\b.*\bto contacts)\b|^(can|could|would|will) you (please )?(qualify|mark\b.*\bqualified|move\b.*\bto contacts)\b/i;
+
 export function isQuestion(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
+  if (QUALIFY_ASK.test(t)) return false;
   if (ASKING.test(t)) return true;
   if (SEARCH_START.test(t) && SEARCH_WORDS.test(t) && !HAPPENED.test(t) && t.split(/\s+/).length <= 12) return true;
   const asked = t.endsWith("?");

@@ -32,7 +32,7 @@ function person(overrides: Partial<ExtractedPerson>): ExtractedPerson {
     name: null, business_name: null, title: null, address: null, phones: [], emails: [],
     contact_type: null, property_types: [], size: null, budget: null,
     desired_location: null, extra_locations: [], follow_up_phrase: null,
-    follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false,
+    follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false, qualify: false,
     properties_mentioned: [], uncertain: [],
     ...overrides,
   };
@@ -273,5 +273,60 @@ describe("a sign", () => {
     const p = buildProposal(sign, [known], ME, "Added from a sign photo.", TODAY, extra);
     expect(p.target.kind).toBe("existing");
     expect(p.changes.find((c) => c.field === "source")).toBeUndefined();
+  });
+});
+
+describe("qualifying a Lead", () => {
+  const ready = {
+    contactType: "Leasee", propertyType: "Healthcare", budget: "", size: "", desiredLocation: "", notes: "", followUp: "",
+    source: "Referral", businessName: "", phone: "8565550175", email: "linda@parkmedical.example", status: "Contacted", contactAddress: "",
+  };
+  const linda = (current: Partial<PersonRecord["current"]> = {}, more: Partial<PersonRecord> = {}) =>
+    record({ name: "Linda Park", current: { ...ready, ...current }, ...more });
+
+  it("is ready when every required field is filled", () => {
+    const p = buildProposal(person({ name: "Linda Park", qualify: true }), [linda()], ME, "Qualify Linda Park", TODAY);
+    expect(p.qualify).toMatchObject({ state: "ready", currentStatus: "Contacted" });
+    expect(p.questions).toEqual([]);
+    expect(p.automations[0]).toBe("Setting Status to Qualified starts the Monday automation that moves Linda Park from Leads to Contacts.");
+  });
+
+  it("asks for each missing required field, one question per field", () => {
+    const p = buildProposal(person({ name: "Linda Park", qualify: true }), [linda({ email: "", contactType: "Not Set" })], ME, "x", TODAY);
+    expect(p.questions.map((q) => q.field)).toEqual(["email", "contactType"]);
+    expect(p.questions[0].question).toBe("To qualify Linda Park, I need their email. What is it?");
+    if (p.qualify?.state !== "ready") throw new Error("expected ready");
+    expect(p.qualify.required.find((r) => r.field === "contactType")?.current).toBe(""); // "Not Set" is empty
+  });
+
+  it("doesn't ask for a field the note fills", () => {
+    const p = buildProposal(person({ name: "Linda Park", qualify: true, emails: ["linda@new.example"] }), [linda({ email: "" })], ME, "x", TODAY);
+    expect(p.questions.map((q) => q.field)).toEqual([]);
+  });
+
+  it("doesn't ask twice when Claude already asks about the field", () => {
+    const p = buildProposal(
+      person({ name: "Linda Park", qualify: true, uncertain: [{ field: "contact_type", question: "Lease or buy?" }] }),
+      [linda({ contactType: "" })], ME, "x", TODAY,
+    );
+    expect(p.questions).toEqual([{ field: "contactType", question: "Lease or buy?" }]);
+  });
+
+  it("explains when there is nothing to qualify", () => {
+    expect(buildProposal(person({ name: "Linda Park", qualify: true }), [linda({}, { board: TEST_BOARDS.contacts })], ME, "x", TODAY).qualify)
+      .toEqual({ state: "contact" });
+    expect(buildProposal(person({ name: "Linda Park", qualify: true }), [linda({ status: "Qualified" })], ME, "x", TODAY).qualify)
+      .toEqual({ state: "already" });
+    expect(buildProposal(person({ name: "Zelda Quinn", qualify: true }), [], ME, "x", TODAY).qualify).toEqual({ state: "new-lead" });
+  });
+
+  it("proposes nothing on someone else's Lead", () => {
+    const p = buildProposal(person({ name: "Linda Park", qualify: true }), [linda({}, { contactBrokerIds: ["2"], contactBrokerNames: "Emily Stein" })], ME, "x", TODAY);
+    expect(p.blocked).toEqual({ reason: "not-owner", owner: "Emily Stein" });
+    expect(p.qualify).toBeUndefined();
+  });
+
+  it("leaves qualifying out unless the broker asked", () => {
+    expect(buildProposal(person({ name: "Linda Park" }), [linda()], ME, "x", TODAY).qualify).toBeUndefined();
   });
 });
