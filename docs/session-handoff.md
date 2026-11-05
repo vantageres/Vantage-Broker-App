@@ -5,7 +5,10 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 ## Where things stand
 
 - Branch `claude/spec-review-planning-8omcwd`. Commit and push there. No pull request unless John asks.
-- Live at https://vantage-broker-app.vercel.app. Vercel deploys from the branch.
+- Live at https://brokers.vantageres.com (Vercel shows the domain Valid since Nov 5). The old address https://vantage-broker-app.vercel.app still works. Vercel deploys from the branch.
+  - DNS for vantageres.com is at **GoDaddy** (nameservers `ns*.domaincontrol.com`), not SiteGround, which hosts the website. `brokers` is a CNAME to the value Vercel shows (`3934f2734fa2c2b7.vercel-dns-017.com`).
+  - Sign-in on the new address needs two settings, which John is doing: the Monday app's redirect URL `https://brokers.vantageres.com/api/auth/callback`, and `APP_URL=https://brokers.vantageres.com` in Vercel, then a redeploy. Until then, sign in on the old address.
+  - Sign-ins are per address: brokers sign in again on the new one, and phones re-add it to the home screen.
 - Since Oct 29 the deployed app works on the **live boards** (real clients). Local runs and scripts use the test boards unless `MONDAY_BOARDS=live` is set.
 - Built and confirmed on Vercel by John:
   - Monday sign-in (OAuth 2.1 with PKCE)
@@ -58,5 +61,5 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 11. **John's decisions and setup:**
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
-   - A Vantage domain later.
+   - Vantage domain: brokers.vantageres.com set up Nov 5 (see "Where things stand"). Optionally redirect the old vercel.app address to it once sign-in works there.
 12. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
