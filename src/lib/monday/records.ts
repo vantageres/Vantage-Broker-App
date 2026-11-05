@@ -1,4 +1,4 @@
-import type { MondayClient } from "./client";
+import { BoardHidden, type MondayClient } from "./client";
 import type { PersonBoard } from "./boards";
 import { pointOf, type MapPoint } from "./properties";
 
@@ -124,6 +124,8 @@ const BY_ID_QUERY = `
     items(ids: $ids) { id name updated_at board { id } column_values(ids: $columns) { id text value } }
   }`;
 
+const boardName = (board: PersonBoard) => (board.key === "leads" ? "the Leads board" : "the Contacts board");
+
 interface ItemsQuery {
   operator: "or";
   rules: { column_id: string; compare_value: string[]; operator: "contains_text" }[];
@@ -137,6 +139,7 @@ async function readItems(monday: MondayClient, board: PersonBoard, accountSlug: 
     columns,
     query,
   });
+  if (!first.boards[0]) throw new BoardHidden(boardName(board));
   let page = first.boards[0].items_page;
   const items = [...page.items];
   while (page.cursor) {
@@ -165,7 +168,9 @@ const PARALLEL = 15;
 // read whole boards.
 export async function loadPersonRecords(monday: MondayClient, board: PersonBoard, accountSlug: string): Promise<PersonRecord[]> {
   type IdPage = { cursor: string | null; items: { id: string }[] };
-  let page = (await monday.query<{ boards: { items_page: IdPage }[] }>(IDS_QUERY, { board: board.boardId })).boards[0].items_page;
+  const visible = (await monday.query<{ boards: { items_page: IdPage }[] }>(IDS_QUERY, { board: board.boardId })).boards[0];
+  if (!visible) throw new BoardHidden(boardName(board));
+  let page = visible.items_page;
   const ids = page.items.map((i) => i.id);
   while (page.cursor) {
     page = (await monday.query<{ next_items_page: IdPage }>(NEXT_IDS_QUERY, { cursor: page.cursor })).next_items_page;

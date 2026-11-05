@@ -14,6 +14,14 @@ export class MondayError extends Error {
   }
 }
 
+// Monday answers a board the broker can't see (a private board they haven't
+// been added to) with no board at all, not an error.
+export class BoardHidden extends MondayError {
+  constructor(readonly board: string) {
+    super(`You don't have access to ${board} in Monday. Ask a board owner to add you.`);
+  }
+}
+
 export interface UploadFile {
   name: string;
   type: string;

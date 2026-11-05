@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MondayClient } from "./client";
+import { BoardHidden, type MondayClient } from "./client";
 import { TEST_BOARDS, type PersonBoard } from "./boards";
 import { loadPersonRecords, searchPersonRecords, type PersonRecord } from "./records";
 import { findMatches, matchTerms, type MatchQuery } from "../matching";
@@ -152,5 +152,15 @@ describe("loadPersonRecords", () => {
     const records = await loadPersonRecords(counting, board, "x");
     expect(records.map((r) => r.name)).toEqual(many.map((m) => m.name));
     expect(sizes).toEqual([100, 100, 50]);
+  });
+});
+
+describe("a board the broker can't see", () => {
+  // Monday answers a private board the broker isn't on with no board at all.
+  const hidden: MondayClient = { query: async <T,>() => ({ boards: [] }) as T };
+
+  it("says so plainly instead of failing", async () => {
+    await expect(loadPersonRecords(hidden, board, "x")).rejects.toThrow("You don't have access to the Leads board in Monday. Ask a board owner to add you.");
+    await expect(searchPersonRecords(hidden, board, "x", { words: ["dave"], phones: [], emails: [] })).rejects.toBeInstanceOf(BoardHidden);
   });
 });

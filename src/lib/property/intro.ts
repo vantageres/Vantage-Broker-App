@@ -7,14 +7,28 @@ const list = (items: string[]) =>
 
 // The line above a property answer: what was searched, and for a person's
 // requirement, what the record lacks or what couldn't be checked.
+const BOARDS = ["Properties New", "Properties (old)"];
+
 export function propertyIntro(result: PropertiesResult): string {
+  const hidden = result.notSearched ?? [];
+  const searchedBoards = BOARDS.filter((b) => !hidden.includes(b));
+  if (!searchedBoards.length) {
+    return `You don't have access to ${list(hidden)} in Monday, so I couldn't search for properties. Ask a board owner to add you.`;
+  }
+  const missedNote = hidden.length
+    ? ` I couldn't search ${list(hidden)}: you don't have access to ${hidden.length === 1 ? "it" : "them"} in Monday. Ask a board owner to add you.`
+    : "";
+  return main(result, searchedBoards) + missedNote;
+}
+
+function main(result: PropertiesResult, searchedBoards: string[]): string {
   const total = result.hits.length + result.more.length;
   const firstOf = result.more.length ? ` The first ${result.hits.length} are below.` : "";
   const p = result.for;
 
   if (!p) {
     return total === 0
-      ? `No properties in Monday match ${result.understood}. I searched all ${result.searched} on Properties New and Properties (old).`
+      ? `No properties in Monday match ${result.understood}. I searched all ${result.searched} on ${list(searchedBoards)}.`
       : `${total === 1 ? "One property matches" : `${total} properties match`}: ${result.understood}.${firstOf}`;
   }
 

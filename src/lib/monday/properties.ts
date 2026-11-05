@@ -1,4 +1,4 @@
-import type { MondayClient } from "./client";
+import { BoardHidden, type MondayClient } from "./client";
 
 // The two property boards, read only: Properties New (suites in subitems) and
 // the old Properties board, looked up together until the migration finishes.
@@ -198,6 +198,7 @@ export async function loadProperties(monday: MondayClient, board: PropertyBoard,
   const suiteColumns = board.suiteColumns ? Object.values(board.suiteColumns) : undefined;
   type Page = { cursor: string | null; items: RawItem[] };
   const first = await monday.query<{ boards: { items_page: Page }[] }>(firstQuery, { board: board.boardId, columns, ...(suiteColumns && { suiteColumns }) });
+  if (!first.boards[0]) throw new BoardHidden(board.label);
   let page = first.boards[0].items_page;
   const items = [...page.items];
   while (page.cursor) {

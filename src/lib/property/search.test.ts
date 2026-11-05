@@ -131,7 +131,7 @@ describe("listings that fit a person's requirement", () => {
 });
 
 describe("the line above a property answer", () => {
-  const base = { kind: "properties" as const, hits: [], more: [], searched: 8 };
+  const base = { kind: "properties" as const, hits: [], more: [], searched: 8, notSearched: [] as string[] };
   const person = { name: "Marcus Bell", url: "u", boardLabel: "Contact", missing: [], notChecked: ["Notes"], place: "Bellmawr", elsewhere: true };
   const hit = searchProperties(PROPERTIES, readQuery("industrial 18,000 sf"))[0];
 
@@ -148,5 +148,15 @@ describe("the line above a property answer", () => {
   it("asks for the missing fields rather than guessing", () => {
     expect(propertyIntro({ ...base, understood: "", for: { ...person, name: "Dave Reyes", boardLabel: "Lead", missing: ["Property Type", "Sq Ft/Acres"], elsewhere: false } }))
       .toBe("Dave Reyes has no Property Type and Sq Ft/Acres in Monday, so I can't match listings without guessing. Add them to the Lead first.");
+  });
+
+  it("names a property board the broker can't see, and searches the rest", () => {
+    expect(propertyIntro({ ...base, understood: "Retail · in Haddonfield", notSearched: ["Properties New"] }))
+      .toBe("No properties in Monday match Retail · in Haddonfield. I searched all 8 on Properties (old). I couldn't search Properties New: you don't have access to it in Monday. Ask a board owner to add you.");
+  });
+
+  it("says so when no property board can be seen", () => {
+    expect(propertyIntro({ ...base, searched: 0, understood: "Retail", notSearched: ["Properties New", "Properties (old)"] }))
+      .toBe("You don't have access to Properties New and Properties (old) in Monday, so I couldn't search for properties. Ask a board owner to add you.");
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
-import type { MondayClient } from "../monday/client";
+import { BoardHidden, type MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms } from "../matching";
@@ -92,7 +92,7 @@ async function signExtra(ctx: Context, photo: PhotoReport, location: MapPoint | 
   const extra: ProposalExtra = { sourceForNew: "Sign" };
   if (photo.sign?.listing) extra.notes = [{ text: `Sign: ${photo.sign.listing}`, why: "What the sign offers describes the property, not what this person wants, so it goes in Notes." }];
   try {
-    const [properties, leads] = await places;
+    const [{ properties }, leads] = await places;
     const found = findSignProperty(properties, leads, { location, address: photo.sign?.address });
     if (found) extra.signProperty = found;
   } catch (error) {
@@ -158,6 +158,7 @@ export type LookupResult =
       hits: PropertyHit[];
       more: { name: string; url: string; boardLabel: string }[];
       searched: number; // properties read from Monday
+      notSearched: string[]; // property boards the broker can't see in Monday
       // Set when the search is a person's requirement ("Any listings for Ray Fulton?").
       for?: {
         name: string;
@@ -190,11 +191,21 @@ export async function propertyLeadsFor(ctx: Context): Promise<PropertyLeadRecord
   }
 }
 
-const loadAllProperties = async (ctx: Context) =>
-  (await Promise.all(Object.values(PROPERTY_BOARDS).map((b) => loadProperties(ctx.monday, b, ctx.accountSlug)))).flat();
+// Every property on the boards the broker can see. A private board they
+// haven't been added to is skipped and named, not an error.
+async function loadAllProperties(ctx: Context) {
+  const notSearched: string[] = [];
+  const read = await Promise.all(Object.values(PROPERTY_BOARDS).map((b) =>
+    loadProperties(ctx.monday, b, ctx.accountSlug).catch((error: unknown) => {
+      if (!(error instanceof BoardHidden)) throw error;
+      notSearched.push(b.label);
+      return [];
+    })));
+  return { properties: read.flat(), notSearched };
+}
 
 async function propertySearch(ctx: Context, question: string): Promise<LookupResult> {
-  const properties = await loadAllProperties(ctx);
+  const { properties, notSearched } = await loadAllProperties(ctx);
   const query = readQuery(question, knownTowns(properties));
   const hits = searchProperties(properties, query);
   return {
@@ -203,17 +214,18 @@ async function propertySearch(ctx: Context, question: string): Promise<LookupRes
     hits: hits.slice(0, PROPERTIES_SHOWN),
     more: hits.slice(PROPERTIES_SHOWN).map(({ property: p }) => ({ name: p.name, url: p.url, boardLabel: p.boardLabel })),
     searched: properties.length,
+    notSearched,
   };
 }
 
 // Available listings that fit a Lead's or Contact's requirement. When none
 // are in the town they want, the same search runs everywhere and says so.
 async function listingsFor(ctx: Context, record: PersonRecord): Promise<LookupResult> {
-  const properties = await loadAllProperties(ctx);
+  const { properties, notSearched } = await loadAllProperties(ctx);
   const { query, missing, notChecked, place } = queryFromRequirement(record.current, knownTowns(properties));
   const person = { name: record.name, url: record.url, boardLabel: record.board.label, missing, notChecked, place };
   if (query.types.length === 0 && !query.size) {
-    return { kind: "properties", understood: "", hits: [], more: [], searched: properties.length, for: { ...person, elsewhere: false } };
+    return { kind: "properties", understood: "", hits: [], more: [], searched: properties.length, notSearched, for: { ...person, elsewhere: false } };
   }
   let hits = searchProperties(properties, query);
   // The town is a preference: nothing there (or no listing in that town at all) widens to everywhere.
@@ -230,6 +242,7 @@ async function listingsFor(ctx: Context, record: PersonRecord): Promise<LookupRe
     hits: hits.slice(0, PROPERTIES_SHOWN),
     more: hits.slice(PROPERTIES_SHOWN).map(({ property: p }) => ({ name: p.name, url: p.url, boardLabel: p.boardLabel })),
     searched: properties.length,
+    notSearched,
     for: { ...person, elsewhere },
   };
 }
