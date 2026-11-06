@@ -92,7 +92,20 @@ export interface Proposal {
   // A new Lead added by an owner of the Leads board, who chooses its Contact
   // Broker and Co-Brokers from the Brokers team (see monday/team.ts). With a
   // problem, the brokers couldn't be read and the choice isn't offered.
-  assign?: { people: { id: string; name: string }[]; me: string; problem?: string };
+  assign?: {
+    people: { id: string; name: string }[];
+    me: string;
+    problem?: string;
+    // Chosen from the note ("assign Emily as the broker"): starting values for
+    // the approval screen, and names that couldn't be matched to one broker.
+    // "" means the note named someone unclear, so no one is chosen yet.
+    contactBroker?: string;
+    coBrokers?: string[];
+    unmatched?: string[];
+  };
+  // The note asked to assign brokers but that can't be done here (not a new
+  // Lead, or the broker isn't an owner of the Leads board).
+  assignNotDone?: string;
 }
 
 export interface Broker {

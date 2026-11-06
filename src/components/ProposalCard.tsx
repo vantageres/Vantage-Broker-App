@@ -70,8 +70,11 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   // A new Lead added by an owner of the Leads board: who it goes to. Someone
   // who isn't a broker themselves (Andrea) starts with no one chosen.
   const assign = proposal.assign && !proposal.assign.problem && proposal.assign.people.length ? proposal.assign : undefined;
-  const [contactBroker, setContactBroker] = useState(assign?.people.some((p) => p.id === assign.me) ? assign.me : "");
-  const [coBrokers, setCoBrokers] = useState<string[]>([]);
+  // The note may have named them ("assign Emily as the broker").
+  const [contactBroker, setContactBroker] = useState(
+    assign?.contactBroker !== undefined ? assign.contactBroker : assign?.people.some((p) => p.id === assign.me) ? assign.me : "",
+  );
+  const [coBrokers, setCoBrokers] = useState<string[]>(assign?.coBrokers ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const t = proposal.target;
@@ -402,9 +405,11 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
                 </select>
               </div>
             </div>
+            {assign.unmatched?.map((u, i) => <p key={i} className="inline-msg bad" style={{ padding: "4px 0 0" }}>{u}</p>)}
             <p className="inline-msg" style={{ padding: "8px 0" }}>Status: New Lead.</p>
           </>
         )}
+        {proposal.assignNotDone && <p className="inline-msg bad" style={{ padding: "8px 0" }}>{proposal.assignNotDone}</p>}
         {isNew && !assign && <p className="inline-msg" style={{ padding: "8px 0" }}>Contact Broker: you. Status: New Lead.</p>}
         {isNew && proposal.assign && !assign && (
           <p className="inline-msg bad" style={{ padding: "0 0 8px" }}>

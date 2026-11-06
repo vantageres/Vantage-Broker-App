@@ -32,7 +32,7 @@ function person(overrides: Partial<ExtractedPerson>): ExtractedPerson {
     name: null, business_name: null, title: null, address: null, phones: [], emails: [],
     contact_type: null, property_types: [], size: null, budget: null,
     desired_location: null, extra_locations: [], follow_up_phrase: null,
-    follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false, qualify: false,
+    follow_up_date: null, source: null, requirement_notes: null, location_is_addition: false, qualify: false, assign_contact_broker: null, assign_co_brokers: [],
     properties_mentioned: [], uncertain: [],
     ...overrides,
   };

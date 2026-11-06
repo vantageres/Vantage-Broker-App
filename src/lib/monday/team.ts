@@ -64,3 +64,17 @@ export async function teamFor(monday: MondayClient, board: PersonBoard, now = Da
   if (!team.problem) cached.set(board.boardId, { team, at: now });
   return team;
 }
+
+// A broker the note names ("Emily", "Ken Richardson"), found in the team: by
+// full name, else by a first or last name that only one broker has. Two
+// brokers named John is a choice for the broker, never a guess.
+export function findBroker(name: string, people: Person[]): { person: Person } | { problem: string } {
+  const clean = (s: string) => s.toLowerCase().replace(/[^a-z' -]/g, "").trim();
+  const asked = clean(name);
+  const full = people.filter((p) => clean(p.name) === asked);
+  if (full.length === 1) return { person: full[0] };
+  const word = people.filter((p) => clean(p.name).split(/\s+/).includes(asked));
+  if (word.length === 1) return { person: word[0] };
+  if (word.length > 1) return { problem: `${word.map((p) => p.name).join(" and ")} are both in the Brokers team, so choose which one for "${name}".` };
+  return { problem: `No one named "${name}" is in the Brokers team, so choose who you meant.` };
+}

@@ -4,7 +4,7 @@ import { BoardHidden, type MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms } from "../matching";
-import { teamFor, type Team } from "../monday/team";
+import { findBroker, teamFor, type Team } from "../monday/team";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal, type ProposalExtra } from "./proposal";
@@ -57,9 +57,32 @@ async function withMap(proposal: Proposal): Promise<Proposal> {
 
 // A board owner on Leads chooses who a new Lead goes to; anyone else becomes
 // its Contact Broker. The list is only a convenience: the save checks again.
-function withAssign(proposal: Proposal, team: Team | null, me: Broker): Proposal {
-  if (proposal.target.kind !== "new-lead" || !team?.owners.includes(me.id)) return proposal;
-  return { ...proposal, assign: { people: team.people, me: me.id, ...(team.problem ? { problem: team.problem } : {}) } };
+export function withAssign(proposal: Proposal, team: Team | null, me: Broker): Proposal {
+  const p = proposal.person;
+  const askedFor = [p.assign_contact_broker, ...p.assign_co_brokers].filter((n): n is string => !!n?.trim());
+  if (proposal.target.kind === "pick") return proposal; // decided once the broker picks
+  if (proposal.target.kind !== "new-lead") {
+    return askedFor.length ? { ...proposal, assignNotDone: `Brokers are chosen only when a new Lead is added, so ${askedFor.join(" and ")} ${askedFor.length === 1 ? "wasn't" : "weren't"} assigned. Change the Contact Broker in Monday.` } : proposal;
+  }
+  if (!team?.owners.includes(me.id)) {
+    return askedFor.length ? { ...proposal, assignNotDone: `Only an owner of the Leads board can choose who a new Lead goes to, so you'll be the Contact Broker.` } : proposal;
+  }
+  const assign: NonNullable<Proposal["assign"]> = { people: team.people, me: me.id, ...(team.problem ? { problem: team.problem } : {}) };
+  if (!team.problem && askedFor.length) {
+    const unmatched: string[] = [];
+    const pick = (name: string) => {
+      const found = findBroker(name, team.people);
+      if ("person" in found) return found.person.id;
+      unmatched.push(found.problem);
+      return undefined;
+    };
+    // An unclear name starts with no one chosen (""), so the broker must pick.
+    if (p.assign_contact_broker?.trim()) assign.contactBroker = pick(p.assign_contact_broker) ?? "";
+    const co = p.assign_co_brokers.filter((n) => n.trim()).map(pick).filter((id): id is string => !!id && id !== assign.contactBroker);
+    if (co.length) assign.coBrokers = [...new Set(co)];
+    if (unmatched.length) assign.unmatched = unmatched;
+  }
+  return { ...proposal, assign };
 }
 
 async function teamOrNull(monday: MondayClient): Promise<Team | null> {
@@ -134,7 +157,7 @@ export async function capture(ctx: Context, note: string, photos: Photo[] = [], 
   const noteText = photoNoteText(note, photo);
   const extra = photo?.kind === "sign" && places ? await signExtra(ctx, photo, location, places) : undefined;
   const built = extraction.people.map((p) => buildProposal(p, records, ctx.me, noteText, today, extra));
-  const owner = built.some((p) => p.target.kind === "new-lead") ? await team : null;
+  const owner = built.some((p) => p.target.kind === "new-lead" || p.person.assign_contact_broker || p.person.assign_co_brokers.length) ? await team : null;
   const proposals = await Promise.all(built.map((p) => withMap(withAssign(p, owner, ctx.me))));
   return { proposals, photo };
 }
@@ -152,7 +175,7 @@ export async function resolve(
   // Read fresh: the record may have just been claimed.
   const record = await loadPersonRecord(ctx.monday, BOARDS[choice.board], choice.id, ctx.accountSlug);
   if (!record) throw new Error("That record wasn't found. It may have been moved or deleted.");
-  return withMap(proposalFor(person, record, ctx.me, noteText, today, ["your choice"], extra));
+  return withMap(withAssign(proposalFor(person, record, ctx.me, noteText, today, ["your choice"], extra), null, ctx.me));
 }
 
 export interface ListedRecord {

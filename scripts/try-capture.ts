@@ -12,7 +12,8 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { mondayClient } from "../src/lib/monday/client";
-import { BOARDS } from "../src/lib/capture/service";
+import { BOARDS, withAssign } from "../src/lib/capture/service";
+import { teamFor } from "../src/lib/monday/team";
 import { searchPersonRecords } from "../src/lib/monday/records";
 import { matchTerms } from "../src/lib/matching";
 import { CAPTURE_MODELS, extractPeople, SavedExtraction, type CaptureModel } from "../src/lib/capture/extract";
@@ -63,6 +64,11 @@ const records = (
 const loadedAt = Date.now();
 
 let proposals = extraction.people.map((p) => buildProposal(p, records, { id: String(me.id), name: me.name }, note, today));
+// As the app does: an owner of the Leads board chooses who a new Lead goes to.
+{
+  const team = await teamFor(monday, BOARDS.leads).catch(() => null);
+  proposals = proposals.map((p) => withAssign(p, team, { id: String(me.id), name: me.name }));
+}
 
 // Map lookup for Desired Location, when a Google Maps key is available.
 const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -105,6 +111,12 @@ function print(p: Proposal) {
     const missing = p.qualify.required.filter((r) => !r.current && !p.changes.some((c) => c.field === r.field)).map((r) => r.label);
     console.log(missing.length ? `Qualify: asks for ${missing.join(", ")} first` : `Qualify: Status ${p.qualify.currentStatus || "empty"} -> Qualified`);
   } else if (p.qualify) console.log(`Qualify: not possible (${p.qualify.state})`);
+  if (p.assign) {
+    const name = (id?: string) => p.assign!.people.find((x) => x.id === id)?.name ?? "(none)";
+    console.log(p.assign.problem ? `Assign: ${p.assign.problem}` : `Assign: Contact Broker ${name(p.assign.contactBroker)}; Co-Brokers ${(p.assign.coBrokers ?? []).map(name).join(", ") || "(none)"}`);
+    for (const u of p.assign.unmatched ?? []) console.log(`Assign note: ${u}`);
+  }
+  if (p.assignNotDone) console.log(`Assign: ${p.assignNotDone}`);
   for (const a of p.automations) console.log(`Automation: ${a}`);
   if (!p.blocked && t.kind !== "pick") console.log(`Broker Note to save: "${p.noteText}"`);
 }

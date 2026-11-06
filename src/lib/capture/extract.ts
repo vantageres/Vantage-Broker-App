@@ -34,6 +34,10 @@ export const ExtractedPerson = z.object({
     .describe("The broker's own words about when to follow up, if any"),
   qualify: z.boolean()
     .describe("True only when the broker asks to qualify this person, says they are qualified, or asks to move them to Contacts"),
+  assign_contact_broker: z.string().nullable()
+    .describe('The colleague the note says should take this person as their broker ("assign Emily as the broker", "pass him to Ken"), as written; null otherwise'),
+  assign_co_brokers: z.array(z.string())
+    .describe("Colleagues the note says should be co-broker on this person, as written"),
   follow_up_date: z.string().nullable()
     .describe("YYYY-MM-DD only when the broker gave a specific day. Null for a month, quarter, or vague time"),
   source: z.enum(SOURCES).nullable().describe("How the broker met this person, only if stated"),
@@ -68,6 +72,8 @@ export const SavedExtraction = z.object({
   people: z.array(ExtractedPerson.extend({
     address: z.string().nullable().optional().transform((a) => a ?? null),
     qualify: z.boolean().optional().transform((q) => q ?? false),
+    assign_contact_broker: z.string().nullable().optional().transform((a) => a ?? null),
+    assign_co_brokers: z.array(z.string()).optional().transform((a) => a ?? []),
   })),
   photo: PhotoReport.extend({ sign: PhotoReport.shape.sign.optional().transform((s) => s ?? null) })
     .nullable().optional().transform((p) => p ?? null),
@@ -92,6 +98,7 @@ Rules:
 - requirement_notes is only for new details that no other field holds. Never repeat a value that has its own field, and never write filler such as "requirement updated". Leave it null when there is nothing to add.
 - A named site, building, or property the person is interested in ("the old Bergen Mill site") is a new detail: put it in requirement_notes as well as properties_mentioned. Only put it in desired_location if it is a town, road, or address that can be found on a map.
 - qualify is true only when the broker asks to qualify the person, says they are qualified, or asks to move them to Contacts. A bare command such as "Qualify Linda Park" is about Linda Park with qualify true and nothing else filled; don't add questions for it. Saying someone is "not qualified" or "unqualified" is not a request to qualify.
+- A colleague the note asks to take the person ("assign Emily as the broker and Ken as the co broker") goes in assign_contact_broker and assign_co_brokers, names as written. Those colleagues are not people to extract, and the request is not a requirement detail.
 - desired_location holds one place. Put any further areas in extra_locations.
 - Highway numbers in New Jersey are usually interstates or routes: "295" means I-295, "73" means Route 73.
 - Write sizes out in full: "15 to 20k sf" becomes "15,000 to 20,000 sf".
