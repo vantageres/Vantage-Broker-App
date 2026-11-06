@@ -261,8 +261,9 @@ describe("qualifying", () => {
 });
 
 describe("choosing who a new Lead goes to", () => {
-  // Answers the Leads board's owners and members, and records mutations.
-  function teamMonday(owners: number[]) {
+  // Answers the Leads board's owners and members and the Brokers team, and
+  // records mutations. Emily (8) is a broker; Sarah (9) is on the board only.
+  function teamMonday(owners: number[], teams: "ok" | "no-scope" = "ok") {
     const mutations: { query: string; vars: Record<string, unknown> }[] = [];
     const client: MondayClient = {
       async query<T>(query: string, vars: Record<string, unknown> = {}) {
@@ -271,11 +272,19 @@ describe("choosing who a new Lead goes to", () => {
           return { create_item: { id: "new1" } } as T;
         }
         if (query.includes("subscribers")) {
-          return { boards: [{ owners: owners.map((id) => ({ id })), subscribers: [
-            { id: 1, name: "John Smyth", enabled: true, is_guest: false, is_view_only: false },
-            { id: 7, name: "Ken Richardson", enabled: true, is_guest: false, is_view_only: false },
-            { id: 8, name: "Emily Stein", enabled: true, is_guest: false, is_view_only: false },
-          ] }] } as T;
+          return { boards: [{ owners: owners.map((id) => ({ id })), subscribers: [{ id: 1 }, { id: 7 }, { id: 8 }, { id: 9 }] }] } as T;
+        }
+        if (query.includes("teams")) {
+          if (teams === "no-scope") throw new Error("Monday rejected the request");
+          return { teams: [
+            { name: "Vantage PM", users: [{ id: 9, name: "Sarah Young", enabled: true, is_guest: false }] },
+            { name: "Brokers", users: [
+              { id: 1, name: "John Smyth", enabled: true, is_guest: false },
+              { id: 7, name: "Ken Richardson", enabled: true, is_guest: false },
+              { id: 8, name: "Emily Stein", enabled: true, is_guest: false },
+              { id: 12, name: "Not On Board", enabled: true, is_guest: false },
+            ] },
+          ] } as T;
         }
         return {} as T;
       },
@@ -301,10 +310,19 @@ describe("choosing who a new Lead goes to", () => {
     expect(mutations).toEqual([]);
   });
 
-  it("refuses someone who isn't on the Leads board", async () => {
-    const { client, mutations } = teamMonday([1]);
-    await expect(saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: ["555"] } }))
-      .rejects.toThrow("Choose brokers who are on the Leads board.");
+  it("refuses anyone outside the Brokers team, or not on the Leads board", async () => {
+    for (const id of ["9", "12", "555"]) {
+      const { client, mutations } = teamMonday([1]);
+      await expect(saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: [id] } }))
+        .rejects.toThrow("Choose brokers from the Brokers team.");
+      expect(mutations).toEqual([]);
+    }
+  });
+
+  it("says what's missing when the Brokers team can't be read", async () => {
+    const { client, mutations } = teamMonday([1], "no-scope");
+    await expect(saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: [] } }))
+      .rejects.toThrow("I can't read the Brokers team in Monday yet. The Monday app needs the teams:read permission, then sign in again.");
     expect(mutations).toEqual([]);
   });
 

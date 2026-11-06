@@ -67,8 +67,10 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [answered, setAnswered] = useState<number[]>([]);
-  // A new Lead added by an owner of the Leads board: who it goes to.
-  const [contactBroker, setContactBroker] = useState(proposal.assign?.me ?? "");
+  // A new Lead added by an owner of the Leads board: who it goes to. Someone
+  // who isn't a broker themselves (Andrea) starts with no one chosen.
+  const assign = proposal.assign && !proposal.assign.problem && proposal.assign.people.length ? proposal.assign : undefined;
+  const [contactBroker, setContactBroker] = useState(assign?.people.some((p) => p.id === assign.me) ? assign.me : "");
   const [coBrokers, setCoBrokers] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -240,7 +242,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
       target, changes, noteText: proposal.noteText, photos: attaching,
       ...(sign?.linkable && linkSign ? { linkProperty: sign.id } : {}),
       ...(qualifying ? { qualify: true } : {}),
-      ...(isNew && proposal.assign ? { assign: { contactBroker, coBrokers: coBrokers.filter((id) => id !== contactBroker) } } : {}),
+      ...(isNew && assign ? { assign: { contactBroker, coBrokers: coBrokers.filter((id) => id !== contactBroker) } } : {}),
     };
   }
 
@@ -270,8 +272,9 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     } else save(saveRequest());
   }
 
-  const kicker = isNew ? (proposal.assign ? "New Lead" : "New Lead · You'll be Contact Broker") : `Update ${t.kind === "existing" ? t.record.boardLabel : ""}`;
-  const personName = (id: string) => proposal.assign?.people.find((p) => p.id === id)?.name ?? "";
+  const kicker = isNew ? (assign ? "New Lead" : "New Lead · You'll be Contact Broker") : `Update ${t.kind === "existing" ? t.record.boardLabel : ""}`;
+  const personName = (id: string) => assign?.people.find((p) => p.id === id)?.name ?? "";
+  const needsBroker = isNew && !!assign && !contactBroker;
   const business = valueOf("businessName")?.value;
 
   if (status.kind === "saved") {
@@ -291,7 +294,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
           <div>
             <div><strong>Saved to {r.name}.</strong> {parts.length ? `${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.` : ""}</div>
             {r.qualified && <div>Monday&apos;s automation moves {r.name} to Contacts in a few seconds.</div>}
-            {isNew && proposal.assign && (r.assignedTo || coBrokers.some((id) => id !== contactBroker)) && (
+            {isNew && assign && (r.assignedTo || coBrokers.some((id) => id !== contactBroker)) && (
               <div>
                 Contact Broker: {r.assignedTo ?? "you"}
                 {coBrokers.some((id) => id !== contactBroker) ? `. Co-Broker${coBrokers.filter((id) => id !== contactBroker).length > 1 ? "s" : ""}: ${coBrokers.filter((id) => id !== contactBroker).map(personName).join(", ")}` : ""}.
@@ -370,13 +373,14 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
           </div>
         )}
 
-        {isNew && proposal.assign && (
+        {isNew && assign && (
           <>
             <div className="row">
               <label className="row-edit" style={{ gap: 6 }}>
                 <span className="row-label">Contact Broker</span>
                 <select className="field" value={contactBroker} disabled={working} onChange={(e) => setContactBroker(e.target.value)}>
-                  {proposal.assign.people.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === proposal.assign!.me ? " (you)" : ""}</option>)}
+                  {!contactBroker && <option value="">Choose a broker…</option>}
+                  {assign.people.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === assign.me ? " (you)" : ""}</option>)}
                 </select>
               </label>
             </div>
@@ -394,14 +398,19 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
                 )}
                 <select className="field" value="" disabled={working} aria-label="Add a Co-Broker" onChange={(e) => { const id = e.target.value; if (id) setCoBrokers((c) => [...c, id]); }}>
                   <option value="">{coBrokers.length ? "Add another Co-Broker…" : "Add a Co-Broker (optional)…"}</option>
-                  {proposal.assign.people.filter((p) => p.id !== contactBroker && !coBrokers.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {assign.people.filter((p) => p.id !== contactBroker && !coBrokers.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             </div>
             <p className="inline-msg" style={{ padding: "8px 0" }}>Status: New Lead.</p>
           </>
         )}
-        {isNew && !proposal.assign && <p className="inline-msg" style={{ padding: "8px 0" }}>Contact Broker: you. Status: New Lead.</p>}
+        {isNew && !assign && <p className="inline-msg" style={{ padding: "8px 0" }}>Contact Broker: you. Status: New Lead.</p>}
+        {isNew && proposal.assign && !assign && (
+          <p className="inline-msg bad" style={{ padding: "0 0 8px" }}>
+            {proposal.assign.problem ?? "No one in the Brokers team is on the Leads board."} Until then, you&apos;ll be the Contact Broker.
+          </p>
+        )}
       </div>
 
       {question && (
@@ -489,13 +498,15 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
         {status.kind === "failed" ? (
           <button className="approve" onClick={retry}>{status.partial ? "Retry" : "Retry save"}</button>
         ) : (
-          <button className="approve" disabled={working || !!question || !!editing || missingMap} onClick={() => save(saveRequest())}>
+          <button className="approve" disabled={working || !!question || !!editing || missingMap || needsBroker} onClick={() => save(saveRequest())}>
             {working
               ? status.what
               : question
                 ? `Answer ${openQuestions.length} question${openQuestions.length === 1 ? "" : "s"} to approve`
                 : missingMap
                   ? "Find Desired Location on the map first"
+                  : needsBroker
+                    ? "Choose a Contact Broker first"
                   : qualifying ? "Approve, save & qualify" : "Approve & save"}
           </button>
         )}

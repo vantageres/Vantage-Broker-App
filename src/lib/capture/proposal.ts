@@ -90,8 +90,9 @@ export interface Proposal {
   extra?: ProposalExtra;
   qualify?: QualifyInfo;
   // A new Lead added by an owner of the Leads board, who chooses its Contact
-  // Broker and Co-Brokers from the board's members (see monday/team.ts).
-  assign?: { people: { id: string; name: string }[]; me: string };
+  // Broker and Co-Brokers from the Brokers team (see monday/team.ts). With a
+  // problem, the brokers couldn't be read and the choice isn't offered.
+  assign?: { people: { id: string; name: string }[]; me: string; problem?: string };
 }
 
 export interface Broker {

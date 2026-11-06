@@ -59,7 +59,7 @@ async function withMap(proposal: Proposal): Promise<Proposal> {
 // its Contact Broker. The list is only a convenience: the save checks again.
 function withAssign(proposal: Proposal, team: Team | null, me: Broker): Proposal {
   if (proposal.target.kind !== "new-lead" || !team?.owners.includes(me.id)) return proposal;
-  return { ...proposal, assign: { people: team.people, me: me.id } };
+  return { ...proposal, assign: { people: team.people, me: me.id, ...(team.problem ? { problem: team.problem } : {}) } };
 }
 
 async function teamOrNull(monday: MondayClient): Promise<Team | null> {

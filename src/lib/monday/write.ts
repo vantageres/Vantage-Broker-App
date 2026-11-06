@@ -232,15 +232,17 @@ async function checkQualify(monday: MondayClient, board: PersonBoard, itemId: st
 }
 
 // Choosing who a new Lead goes to: only an owner of the Leads board may, and
-// only people on the board can be chosen. Read fresh from Monday.
+// only members of the Brokers team who are on the board can be chosen. Read
+// fresh from Monday.
 async function checkAssign(monday: MondayClient, board: PersonBoard, me: Me, assign: { contactBroker: string; coBrokers: string[] }) {
   const team = await readTeam(monday, board);
   if (!team.owners.includes(me.id)) throw new SaveRefused("Only an owner of the Leads board can choose who a new Lead goes to.");
-  const onBoard = new Set(team.people.map((p) => p.id));
+  if (team.problem) throw new SaveRefused(team.problem);
+  const brokers = new Set(team.people.map((p) => p.id));
   const contactBroker = String(assign.contactBroker ?? "");
   const coBrokers = [...new Set((Array.isArray(assign.coBrokers) ? assign.coBrokers : []).map(String))].filter((id) => id !== contactBroker);
-  const stranger = [contactBroker, ...coBrokers].find((id) => !onBoard.has(id));
-  if (stranger !== undefined) throw new SaveRefused("Choose brokers who are on the Leads board.");
+  const stranger = [contactBroker, ...coBrokers].find((id) => !brokers.has(id));
+  if (stranger !== undefined) throw new SaveRefused("Choose brokers from the Brokers team.");
   return { contactBroker, coBrokers, contactBrokerName: team.people.find((p) => p.id === contactBroker)?.name ?? "" };
 }
 
