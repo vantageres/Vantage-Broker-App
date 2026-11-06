@@ -67,6 +67,9 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [answered, setAnswered] = useState<number[]>([]);
+  // A new Lead added by an owner of the Leads board: who it goes to.
+  const [contactBroker, setContactBroker] = useState(proposal.assign?.me ?? "");
+  const [coBrokers, setCoBrokers] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const t = proposal.target;
@@ -237,6 +240,7 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
       target, changes, noteText: proposal.noteText, photos: attaching,
       ...(sign?.linkable && linkSign ? { linkProperty: sign.id } : {}),
       ...(qualifying ? { qualify: true } : {}),
+      ...(isNew && proposal.assign ? { assign: { contactBroker, coBrokers: coBrokers.filter((id) => id !== contactBroker) } } : {}),
     };
   }
 
@@ -266,7 +270,8 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     } else save(saveRequest());
   }
 
-  const kicker = isNew ? "New Lead · You'll be Contact Broker" : `Update ${t.kind === "existing" ? t.record.boardLabel : ""}`;
+  const kicker = isNew ? (proposal.assign ? "New Lead" : "New Lead · You'll be Contact Broker") : `Update ${t.kind === "existing" ? t.record.boardLabel : ""}`;
+  const personName = (id: string) => proposal.assign?.people.find((p) => p.id === id)?.name ?? "";
   const business = valueOf("businessName")?.value;
 
   if (status.kind === "saved") {
@@ -286,6 +291,12 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
           <div>
             <div><strong>Saved to {r.name}.</strong> {parts.length ? `${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.` : ""}</div>
             {r.qualified && <div>Monday&apos;s automation moves {r.name} to Contacts in a few seconds.</div>}
+            {isNew && proposal.assign && (r.assignedTo || coBrokers.some((id) => id !== contactBroker)) && (
+              <div>
+                Contact Broker: {r.assignedTo ?? "you"}
+                {coBrokers.some((id) => id !== contactBroker) ? `. Co-Broker${coBrokers.filter((id) => id !== contactBroker).length > 1 ? "s" : ""}: ${coBrokers.filter((id) => id !== contactBroker).map(personName).join(", ")}` : ""}.
+              </div>
+            )}
             <a className="open" href={status.url} target="_blank" rel="noreferrer">Open in Monday <Out /></a>
           </div>
         </div>
@@ -359,7 +370,38 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
           </div>
         )}
 
-        {isNew && <p className="inline-msg" style={{ padding: "8px 0" }}>Contact Broker: you. Status: New Lead.</p>}
+        {isNew && proposal.assign && (
+          <>
+            <div className="row">
+              <label className="row-edit" style={{ gap: 6 }}>
+                <span className="row-label">Contact Broker</span>
+                <select className="field" value={contactBroker} disabled={working} onChange={(e) => setContactBroker(e.target.value)}>
+                  {proposal.assign.people.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === proposal.assign!.me ? " (you)" : ""}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="row">
+              <div className="row-edit" style={{ gap: 6 }}>
+                <span className="row-label">Co-Brokers</span>
+                {coBrokers.filter((id) => id !== contactBroker).length > 0 && (
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {coBrokers.filter((id) => id !== contactBroker).map((id) => (
+                      <button key={id} className="small-btn" disabled={working} aria-label={`Remove ${personName(id)}`} onClick={() => setCoBrokers((c) => c.filter((x) => x !== id))}>
+                        {personName(id)} ×
+                      </button>
+                    ))}
+                  </span>
+                )}
+                <select className="field" value="" disabled={working} aria-label="Add a Co-Broker" onChange={(e) => { const id = e.target.value; if (id) setCoBrokers((c) => [...c, id]); }}>
+                  <option value="">{coBrokers.length ? "Add another Co-Broker…" : "Add a Co-Broker (optional)…"}</option>
+                  {proposal.assign.people.filter((p) => p.id !== contactBroker && !coBrokers.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <p className="inline-msg" style={{ padding: "8px 0" }}>Status: New Lead.</p>
+          </>
+        )}
+        {isNew && !proposal.assign && <p className="inline-msg" style={{ padding: "8px 0" }}>Contact Broker: you. Status: New Lead.</p>}
       </div>
 
       {question && (

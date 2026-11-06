@@ -62,6 +62,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - Vantage domain: brokers.vantageres.com set up Nov 5 (see "Where things stand"). Sign-in works there (Nov 5). Optionally redirect the old vercel.app address to it in Vercel → Domains.
-12. **Add the brokers to Vantage Properties New** (John, in Monday). It is private with only John on it, so other brokers' property searches skip it (the app now says so instead of failing).
-13. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Confirmed by John on the live site Nov 5 (Kristin Smyth moved to Contacts with her fields and notes). Still to check with a Lead that has them: that Business Name and Files carry over (spec item 5 for the automation).
-14. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
+12. **Assigning new Leads** (built Nov 6; see `build-plan.md`). Andrea to try on the live site: add a Lead from a call, choose the broker, approve, and check the Lead in Monday.
+13. **Add the brokers to Vantage Properties New** (John, in Monday). It is private with only John on it, so other brokers' property searches skip it (the app now says so instead of failing).
+14. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Confirmed by John on the live site Nov 5 (Kristin Smyth moved to Contacts with her fields and notes). Still to check with a Lead that has them: that Business Name and Files carry over (spec item 5 for the automation).
+15. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).

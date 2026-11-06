@@ -89,6 +89,9 @@ export interface Proposal {
   currentPropertyType?: string;
   extra?: ProposalExtra;
   qualify?: QualifyInfo;
+  // A new Lead added by an owner of the Leads board, who chooses its Contact
+  // Broker and Co-Brokers from the board's members (see monday/team.ts).
+  assign?: { people: { id: string; name: string }[]; me: string };
 }
 
 export interface Broker {

@@ -1,5 +1,6 @@
 import type { MondayClient } from "./client";
 import type { Photo } from "../capture/extract";
+import { readTeam } from "./team";
 import { BROKER_NOTE_ACTIVITY_ID, CONTACT_TYPES, PROPERTY_TYPES, QUALIFY_REQUIRED, SOURCES, type PersonBoard } from "./boards";
 
 // Writes an approved proposal to Monday. Every check that protects a record
@@ -28,6 +29,9 @@ export interface SaveRequest {
   // Set the Lead's Status to Qualified after everything else is saved, which
   // starts the Monday automation that moves it to Contacts.
   qualify?: boolean;
+  // A new Lead only: who it goes to, chosen by an owner of the Leads board.
+  // Without it, the broker saving is the Contact Broker.
+  assign?: { contactBroker: string; coBrokers: string[] };
 }
 
 export interface SaveOptions {
@@ -199,6 +203,7 @@ export interface SaveResult {
   noteAdded: boolean;
   photosAttached: number;
   qualified: boolean;
+  assignedTo?: string; // a new Lead given to someone else: their name
 }
 
 const REQUIRED_LABELS: Record<(typeof QUALIFY_REQUIRED)[number], string> = {
@@ -226,6 +231,19 @@ async function checkQualify(monday: MondayClient, board: PersonBoard, itemId: st
   }
 }
 
+// Choosing who a new Lead goes to: only an owner of the Leads board may, and
+// only people on the board can be chosen. Read fresh from Monday.
+async function checkAssign(monday: MondayClient, board: PersonBoard, me: Me, assign: { contactBroker: string; coBrokers: string[] }) {
+  const team = await readTeam(monday, board);
+  if (!team.owners.includes(me.id)) throw new SaveRefused("Only an owner of the Leads board can choose who a new Lead goes to.");
+  const onBoard = new Set(team.people.map((p) => p.id));
+  const contactBroker = String(assign.contactBroker ?? "");
+  const coBrokers = [...new Set((Array.isArray(assign.coBrokers) ? assign.coBrokers : []).map(String))].filter((id) => id !== contactBroker);
+  const stranger = [contactBroker, ...coBrokers].find((id) => !onBoard.has(id));
+  if (stranger !== undefined) throw new SaveRefused("Choose brokers who are on the Leads board.");
+  return { contactBroker, coBrokers, contactBrokerName: team.people.find((p) => p.id === contactBroker)?.name ?? "" };
+}
+
 export async function saveProposal(
   monday: MondayClient,
   boards: Record<"leads" | "contacts", PersonBoard>,
@@ -242,9 +260,12 @@ export async function saveProposal(
     const board = boards.leads;
     const name = request.changes.find((c) => c.field === "name")?.value.trim();
     if (!name) throw new SaveRefused("A new Lead needs a name.");
+    const assigned = request.assign ? await checkAssign(monday, board, me, request.assign) : null;
+    const people = (ids: string[]) => ({ personsAndTeams: ids.map((id) => ({ id: Number(id), kind: "person" })) });
     const values: Record<string, unknown> = {
-      [board.columns.contactBroker]: { personsAndTeams: [{ id: Number(me.id), kind: "person" }] },
+      [board.columns.contactBroker]: people([assigned?.contactBroker ?? me.id]),
     };
+    if (assigned?.coBrokers.length) values[board.columns.coBrokers] = people(assigned.coBrokers);
     if (board.columns.status) values[board.columns.status] = { label: "New Lead" };
     for (const change of request.changes) {
       const cv = columnValue(board, change);
@@ -257,7 +278,10 @@ export async function saveProposal(
        }`,
       { board: board.boardId, name, values: JSON.stringify(values) },
     );
-    const result: SaveResult = { board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length + (link ? 1 : 0), noteAdded: false, photosAttached: 0, qualified: false };
+    const result: SaveResult = {
+      board: "leads", itemId: created.create_item.id, name, fieldsChanged: request.changes.length + (link ? 1 : 0), noteAdded: false, photosAttached: 0, qualified: false,
+      ...(assigned && assigned.contactBroker !== me.id ? { assignedTo: assigned.contactBrokerName } : {}),
+    };
     return afterFields(monday, board, result, photos, note, false);
   }
 
@@ -266,7 +290,12 @@ export async function saveProposal(
 
   // Ownership is checked again here, just before the write.
   const owners = await readOwners(monday, board, itemId);
-  if (!owners.contactBroker.includes(me.id) && !owners.coBrokers.includes(me.id)) {
+  // A Leads board owner who gave a new Lead to someone else may still add the
+  // note or photo that didn't make it on the first try, and nothing else.
+  const assignedToMe = owners.contactBroker.includes(me.id) || owners.coBrokers.includes(me.id);
+  const finishingNewLead = !assignedToMe && board.key === "leads" && request.changes.length === 0 && !request.qualify && !request.linkProperty
+    && (await readTeam(monday, board)).owners.includes(me.id);
+  if (!assignedToMe && !finishingNewLead) {
     if (owners.contactBroker.length === 0) throw new SaveRefused(`${owners.name} has no Contact Broker. Claim it first.`);
     throw new SaveRefused(`${owners.name} belongs to ${owners.contactBrokerNames}.`, owners.contactBrokerNames);
   }

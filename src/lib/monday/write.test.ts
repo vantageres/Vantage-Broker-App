@@ -259,3 +259,83 @@ describe("qualifying", () => {
     expect(error.result).toMatchObject({ noteAdded: true, qualified: false, fieldsChanged: 1 });
   });
 });
+
+describe("choosing who a new Lead goes to", () => {
+  // Answers the Leads board's owners and members, and records mutations.
+  function teamMonday(owners: number[]) {
+    const mutations: { query: string; vars: Record<string, unknown> }[] = [];
+    const client: MondayClient = {
+      async query<T>(query: string, vars: Record<string, unknown> = {}) {
+        if (query.trim().startsWith("mutation")) {
+          mutations.push({ query, vars });
+          return { create_item: { id: "new1" } } as T;
+        }
+        if (query.includes("subscribers")) {
+          return { boards: [{ owners: owners.map((id) => ({ id })), subscribers: [
+            { id: 1, name: "John Smyth", enabled: true, is_guest: false, is_view_only: false },
+            { id: 7, name: "Ken Richardson", enabled: true, is_guest: false, is_view_only: false },
+            { id: 8, name: "Emily Stein", enabled: true, is_guest: false, is_view_only: false },
+          ] }] } as T;
+        }
+        return {} as T;
+      },
+    };
+    return { client, mutations };
+  }
+  const newLead = { target: { kind: "new-lead" as const }, changes: [{ field: "name" as const, value: "Zelda Quinn" }], noteText: "" };
+  const c = TEST_BOARDS.leads.columns;
+
+  it("lets a board owner give the Lead to another broker, with Co-Brokers", async () => {
+    const { client, mutations } = teamMonday([1]);
+    const result = await saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: ["8", "7"] } });
+    const values = JSON.parse(mutations[0].vars.values as string);
+    expect(values[c.contactBroker]).toEqual({ personsAndTeams: [{ id: 7, kind: "person" }] });
+    expect(values[c.coBrokers]).toEqual({ personsAndTeams: [{ id: 8, kind: "person" }] }); // the Contact Broker isn't also a Co-Broker
+    expect(result.assignedTo).toBe("Ken Richardson");
+  });
+
+  it("refuses anyone who isn't an owner of the Leads board", async () => {
+    const { client, mutations } = teamMonday([99]);
+    await expect(saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: [] } }))
+      .rejects.toThrow("Only an owner of the Leads board can choose who a new Lead goes to.");
+    expect(mutations).toEqual([]);
+  });
+
+  it("refuses someone who isn't on the Leads board", async () => {
+    const { client, mutations } = teamMonday([1]);
+    await expect(saveProposal(client, TEST_BOARDS, ME, { ...newLead, assign: { contactBroker: "7", coBrokers: ["555"] } }))
+      .rejects.toThrow("Choose brokers who are on the Leads board.");
+    expect(mutations).toEqual([]);
+  });
+
+  it("makes the broker saving the Contact Broker when nobody is chosen", async () => {
+    const { client, mutations } = teamMonday([]);
+    const result = await saveProposal(client, TEST_BOARDS, ME, newLead);
+    expect(JSON.parse(mutations[0].vars.values as string)[c.contactBroker]).toEqual({ personsAndTeams: [{ id: 1, kind: "person" }] });
+    expect(result.assignedTo).toBeUndefined();
+  });
+});
+
+describe("finishing a new Lead given to someone else", () => {
+  // John owns the Leads board; the Lead now belongs to Ken.
+  const client: MondayClient = {
+    async query<T>(query: string) {
+      if (query.trim().startsWith("mutation")) return {} as T;
+      if (query.includes("subscribers")) return { boards: [{ owners: [{ id: 1 }], subscribers: [] }] } as T;
+      return { items: [{ name: "Zelda Quinn", board: { id: TEST_BOARDS.leads.boardId }, column_values: [
+        { id: "person", text: "Ken Richardson", value: JSON.stringify({ personsAndTeams: [{ id: 7, kind: "person" }] }) },
+        { id: "people", text: "", value: null },
+      ] }] } as T;
+    },
+  };
+
+  it("lets a board owner add the note that didn't make it", async () => {
+    await expect(saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [], noteText: "Called in, wants 2,000 sf" }))
+      .resolves.toMatchObject({ noteAdded: true });
+  });
+
+  it("still refuses any change to the Lead's fields", async () => {
+    await expect(saveProposal(client, TEST_BOARDS, ME, { target: existing, changes: [{ field: "size", value: "2,000 sf" }], noteText: "" }))
+      .rejects.toThrow("Zelda Quinn belongs to Ken Richardson.");
+  });
+});

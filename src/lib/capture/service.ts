@@ -4,6 +4,7 @@ import { BoardHidden, type MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms } from "../matching";
+import { teamFor, type Team } from "../monday/team";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
 import { buildProposal, proposalFor, type Broker, type Proposal, type ProposalExtra } from "./proposal";
@@ -52,6 +53,21 @@ function geocoder(): Geocoder | null {
 async function withMap(proposal: Proposal): Promise<Proposal> {
   const geocode = geocoder();
   return geocode ? resolveLocations(proposal, geocode) : proposal;
+}
+
+// A board owner on Leads chooses who a new Lead goes to; anyone else becomes
+// its Contact Broker. The list is only a convenience: the save checks again.
+function withAssign(proposal: Proposal, team: Team | null, me: Broker): Proposal {
+  if (proposal.target.kind !== "new-lead" || !team?.owners.includes(me.id)) return proposal;
+  return { ...proposal, assign: { people: team.people, me: me.id } };
+}
+
+async function teamOrNull(monday: MondayClient): Promise<Team | null> {
+  try {
+    return await teamFor(monday, BOARDS.leads);
+  } catch {
+    return null; // without the list, the broker adding the Lead is its Contact Broker, as before
+  }
 }
 
 export interface Context {
@@ -108,6 +124,7 @@ export async function capture(ctx: Context, note: string, photos: Photo[] = [], 
   // property adds no wait.
   const places = photos.length ? Promise.all([loadAllProperties(ctx), propertyLeadsFor(ctx)]) : null;
   places?.catch(() => {}); // a failure is reported where it's used
+  const team = teamOrNull(ctx.monday); // read meanwhile; used if a new Lead is proposed
   const extraction = dev ? dev : await extractPeople(claude(), note, today, undefined, photos);
   // Monday is searched for the people Claude found, not read in full.
   const queries = extraction.people.map((p) => ({ name: p.name, businessName: p.business_name, phones: p.phones, emails: p.emails }));
@@ -116,7 +133,9 @@ export async function capture(ctx: Context, note: string, photos: Photo[] = [], 
   if (photo?.unreadable && extraction.people.length === 0) return { proposals: [], photo };
   const noteText = photoNoteText(note, photo);
   const extra = photo?.kind === "sign" && places ? await signExtra(ctx, photo, location, places) : undefined;
-  const proposals = await Promise.all(extraction.people.map((p) => withMap(buildProposal(p, records, ctx.me, noteText, today, extra))));
+  const built = extraction.people.map((p) => buildProposal(p, records, ctx.me, noteText, today, extra));
+  const owner = built.some((p) => p.target.kind === "new-lead") ? await team : null;
+  const proposals = await Promise.all(built.map((p) => withMap(withAssign(p, owner, ctx.me))));
   return { proposals, photo };
 }
 
@@ -129,7 +148,7 @@ export async function resolve(
   extra?: ProposalExtra,
 ): Promise<Proposal> {
   const today = todayInNewJersey();
-  if (choice === "new") return withMap(proposalFor(person, null, ctx.me, noteText, today, [], extra));
+  if (choice === "new") return withMap(withAssign(proposalFor(person, null, ctx.me, noteText, today, [], extra), await teamOrNull(ctx.monday), ctx.me));
   // Read fresh: the record may have just been claimed.
   const record = await loadPersonRecord(ctx.monday, BOARDS[choice.board], choice.id, ctx.accountSlug);
   if (!record) throw new Error("That record wasn't found. It may have been moved or deleted.");
