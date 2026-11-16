@@ -29,7 +29,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 - To check behaviour, a session runs the app locally against the test boards:
   - `NODE_USE_ENV_PROXY=1 npx next dev`, with `MONDAY_DEV_PROXY_AUTH=1` in `.env.local`
   - the network secret adds the Monday token
-  - drive it with Playwright using `the Chromium under `/opt/pw-browsers` (the folder name changes between containers; Nov 16: `chromium-1243/chrome-linux64/chrome`)`
+  - drive it with Playwright using the Chromium under `/opt/pw-browsers` (the folder name changes between containers; Nov 16: `chromium-1243/chrome-linux64/chrome`)
 - `.env.local` is gitignored. A new session needs `SESSION_SECRET` (any 32+ characters), `MONDAY_DEV_PROXY_AUTH=1`, and optionally `DEV_EXTRACTION_FILE` (a saved extraction JSON used instead of calling Claude).
 - The Claude key is not in this environment, so local capture uses the saved extraction.
 - John's Windows PC (`C:\Claude Projects\Vantage Broker App`) reaches the test boards with John's personal Monday token, `MONDAY_DEV_TOKEN` in `.env.local` (added Oct 14; never print it). "Development sign-in" and the scripts use it, and while it is in use any write outside the Broker App Test workspace is refused in code (`testWorkspaceOnly` in `src/lib/monday/client.ts`). Ask questions with `npx tsx --env-file=.env.local scripts/try-lookup.ts "question"`. The npm scripts that set variables don't run in Windows' default shell; run `npx next dev` directly.
