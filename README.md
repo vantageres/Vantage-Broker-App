@@ -20,6 +20,8 @@ Settings, in `.env.local` for development or the host's settings in production:
 | `GOOGLE_MAPS_API_KEY` | Google Maps Geocoding key, for Desired Location. |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Upstash Redis (added by Vercel's Upstash integration). Holds approval settings and the short sign-in renewal lock; never Monday records. Required in production; development uses an in-memory stand-in. |
 | `OPERATIONS_MANAGER_IDS` | Monday user ids, comma-separated, allowed to change approval settings at `/admin/approvals`. |
+| `EMAIL_MONITOR_USERS` | Monday user ids, comma-separated, who see the Email tab while it is built (`docs/email-monitor-plan.md`). Unset: nobody. |
+| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT_ID` | The Entra app registration for Connect Outlook (Web platform, delegated `Mail.Read`, `User.Read`, `openid`, `offline_access`). Its redirect URI is `APP_URL/api/email/callback`. |
 
 Development only (ignored in production):
 
