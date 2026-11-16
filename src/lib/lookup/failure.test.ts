@@ -14,6 +14,8 @@ describe("lookupFailure", () => {
     expect(lookupFailure(new SummaryProblem("unreadable", "x")).message).toBe("I couldn't answer that. Can you ask in another way? The summary came back incomplete.");
     expect(lookupFailure(apiError(400, "prompt is too long: 250000 tokens")).message)
       .toBe("I couldn't answer that. Can you ask in another way? It needed more records than Claude can read at once. Try naming a property type or a town.");
+    expect(lookupFailure(apiError(400, "Schema is too complex for compilation.")).message)
+      .toBe("I couldn't answer that. Can you ask in another way? Something went wrong on our side, and it's been logged.");
     expect(lookupFailure(new MondayError("Monday rejected the request", [{ message: "Column not found" }])).message)
       .toBe("I couldn't answer that. Can you ask in another way? Monday couldn't run the search it needed.");
   });

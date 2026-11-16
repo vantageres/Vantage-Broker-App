@@ -1,13 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import { ExtractedPerson } from "../capture/extract";
+import type { ExtractedPerson } from "../capture/extract";
 import { LEAD_PROPERTY_TYPES, LISTING_TYPES } from "./fields";
 
 // What Claude reads out of a note asking for a new Property Lead: the
-// property, and the person to contact about it. The contact uses the same
-// shape as a captured person, so a new Lead for them goes through the usual
-// new-Lead proposal. Matching, permissions and value checks happen in code.
+// property, and the person to contact about it. Matching, permissions and
+// value checks happen in code.
+//
+// Kept small on purpose: a structured answer allows only so many fields that
+// can be empty (about 16), and the full person format alone has 13. The
+// contact is turned into a person in code (contactAsPerson) for a new Lead.
 export const PropertyLeadDraft = z.object({
   address: z.string().nullable()
     .describe('The property\'s street address as written, with the town, e.g. "140 Main St, Moorestown, NJ". Null if none is given'),
@@ -17,14 +20,30 @@ export const PropertyLeadDraft = z.object({
     .describe("Only if the note says. Warehouse or flex space is Industrial/Flex"),
   listing_price: z.string().nullable().describe('The asking price or rent as written, e.g. "$1,800,000" or "$12/sf NNN"'),
   size: z.string().nullable().describe('Size written out in full, e.g. "12,000 sf" or "2.5 acres"'),
-  contact: ExtractedPerson.nullable()
-    .describe("The person to contact about the property (usually the owner), or null if none is named"),
+  contact: z.object({
+    name: z.string().nullable().describe("The contact's name as written, or null if no person is named"),
+    business_name: z.string().nullable().describe("The contact's business, if given"),
+    phones: z.array(z.string()).describe("Phone numbers exactly as written"),
+    emails: z.array(z.string()),
+    is_owner: z.boolean().describe("True when the note says this person owns the property"),
+  }).describe("The person to contact about the property (usually the owner). Name and business are null when none is named"),
   uncertain: z.array(z.object({
     field: z.enum(["address", "listing_type", "property_type", "listing_price", "size", "other"]),
     question: z.string().describe("One short question to ask the broker, ending in a question mark"),
   })).describe("Anything about the property you could not read with confidence. Never guess; ask here instead"),
 });
 export type PropertyLeadDraft = z.infer<typeof PropertyLeadDraft>;
+
+// The contact as a captured person, for the usual new-Lead proposal.
+export function contactAsPerson(c: PropertyLeadDraft["contact"]): ExtractedPerson {
+  return {
+    name: c.name, business_name: c.business_name, title: null, address: null, phones: c.phones, emails: c.emails,
+    contact_type: c.is_owner ? "Property Owner" : null, property_types: [], size: null, budget: null,
+    desired_location: null, extra_locations: [], location_is_addition: false, follow_up_phrase: null, follow_up_date: null,
+    source: null, requirement_notes: null, properties_mentioned: [], uncertain: [], qualify: false,
+    assign_contact_broker: null, assign_co_brokers: [],
+  };
+}
 
 const SYSTEM = `You read a note from a commercial real estate broker at Vantage asking to add a Property Lead: a property an owner may want to sell or lease through Vantage. Extract the property and its contact into the schema.
 
@@ -33,9 +52,7 @@ Rules:
 - The address is the property's, written so it can be found on a map. If no town is given, leave the address as written.
 - listing_type is Sale, Lease, or Sale or Lease. "Wants to sell" is Sale; "for lease" is Lease.
 - Write sizes out in full: "12k sf" becomes "12,000 sf". Keep prices as written.
-- The contact is a person (usually the owner) with their name, business, phones and emails. Set their contact_type to Property Owner when they own the property.
-- The property's details (its address, size, type, price) describe the property, not what the contact wants: leave the contact's desired_location, size, property_types, budget and requirement_notes empty unless the note says the contact also wants space.
-- Set the contact's qualify to false and leave assign_contact_broker empty and assign_co_brokers empty.
+- The contact is the person to call about the property (usually the owner): their name, business, phones and emails, and whether they own it. The property's details describe the property, not the contact.
 - If something is unclear, leave it empty and add one question to uncertain rather than choosing.`;
 
 export async function extractPropertyLead(client: Anthropic, note: string, today: string): Promise<PropertyLeadDraft> {

@@ -34,10 +34,12 @@ export function lookupFailure(error: unknown): { message: string; status: number
     if (error.status && error.status >= 500) {
       return { message: "I couldn't answer that: Claude had a problem. Try again in a moment.", status: 502 };
     }
-    if (/too long|too large|too many tokens/i.test(error.message)) {
+    // Only a request that really held too much (a summary over very many records).
+    if (/prompt is too long|too many (input )?tokens|context window/i.test(error.message)) {
       return { message: `${ASK_AGAIN} It needed more records than Claude can read at once. Try naming a property type or a town.`, status: 502 };
     }
-    return { message: `${ASK_AGAIN} Claude couldn't work with the question as asked.`, status: 502 };
+    // Any other refusal of the request itself (for example its answer format) is the app's doing.
+    return { message: `${ASK_AGAIN} Something went wrong on our side, and it's been logged.`, status: 502 };
   }
 
   if (error instanceof SummaryProblem) {

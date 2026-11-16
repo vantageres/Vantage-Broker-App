@@ -4,7 +4,7 @@ import { BoardHidden, type MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms, scoreRecord } from "../matching";
-import { extractPropertyLead, PropertyLeadDraft } from "../property-leads/extract";
+import { contactAsPerson, extractPropertyLead, PropertyLeadDraft } from "../property-leads/extract";
 import { createPropertyLead, type ContactOption, type CreatePropertyLeadRequest, type NewPropertyLeadProposal } from "../property-leads/create";
 import { findBroker, teamFor, type Team } from "../monday/team";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
@@ -398,7 +398,7 @@ export async function newPropertyLead(ctx: Context, note: string): Promise<NewPr
 
   let contact: NewPropertyLeadProposal["contact"] = null;
   const c = draft.contact;
-  if (c && (c.name || c.business_name)) {
+  if (c.name || c.business_name) {
     const query = { name: c.name, businessName: c.business_name, phones: c.phones, emails: c.emails };
     const records = await peopleMatching(ctx.monday, ctx.accountSlug, matchTerms([query]));
     const ranked = records
@@ -411,7 +411,7 @@ export async function newPropertyLead(ctx: Context, note: string): Promise<NewPr
     }));
     const top = ranked[0];
     const recommended = top?.scored && top.scored.score >= 60 && top.r.board.key === "contacts" ? top.r.id : undefined;
-    const newLead = withAssign(proposalFor({ ...c, qualify: false }, null, ctx.me, note, today), await team, ctx.me);
+    const newLead = withAssign(proposalFor(contactAsPerson(c), null, ctx.me, note, today), await team, ctx.me);
     contact = { name: c.name ?? c.business_name ?? "", candidates, ...(recommended ? { recommended } : {}), newLead: await withMap(newLead) };
   }
 

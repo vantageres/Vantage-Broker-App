@@ -81,3 +81,22 @@ describe("asksForNewPropertyLead", () => {
     "How many property leads did we add?",
   ])("doesn't: %s", (t) => expect(asksForNewPropertyLead(t)).toBe(false));
 });
+
+describe("the Property Lead answer format", () => {
+  // A structured answer allows only so many fields that can be empty; the
+  // first version of this format, with the whole person format inside, failed.
+  it("stays well under the limit on fields that can be empty", async () => {
+    const { betaZodOutputFormat } = await import("@anthropic-ai/sdk/helpers/beta/zod");
+    const { PropertyLeadDraft } = await import("./extract");
+    let unions = 0;
+    const walk = (s: unknown): void => {
+      if (!s || typeof s !== "object") return;
+      if (Array.isArray(s)) return s.forEach(walk);
+      const o = s as Record<string, unknown>;
+      if (o.anyOf || Array.isArray(o.type)) unions++;
+      Object.values(o).forEach(walk);
+    };
+    walk((betaZodOutputFormat(PropertyLeadDraft) as { schema: unknown }).schema);
+    expect(unions).toBeLessThanOrEqual(8);
+  });
+});

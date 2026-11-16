@@ -11,7 +11,8 @@ export async function POST(req: Request) {
     try {
       return NextResponse.json({ proposal: await newPropertyLead(ctx, note.trim()) });
     } catch (error) {
-      console.error("[property-lead/new]", error instanceof Error ? error.message : error);
+      // The full reason, for the server log only.
+      console.error("[property-lead/new]", error instanceof Error ? `${error.constructor.name}: ${error.message}` : error);
       const { message, status } = lookupFailure(error);
       return fail(new Error(message.replace("I couldn't answer that", "I couldn't read that note")), status);
     }
