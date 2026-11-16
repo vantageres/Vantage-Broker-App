@@ -3,15 +3,13 @@
 import { useState } from "react";
 import type { NewPropertyLeadProposal } from "@/lib/property-leads/create";
 import type { PropertyLeadView } from "@/lib/property-leads/board";
-import type { Proposal } from "@/lib/capture/proposal";
 import { LEAD_PROPERTY_TYPES, LISTING_TYPES } from "@/lib/property-leads/fields";
 import { PropertyLeadCard } from "./PropertyLeadCard";
-import { ProposalCard } from "./ProposalCard";
-import { Alert, Bolt, Check, Out, Plus } from "./icons";
+import { Alert, Bolt, Check, Out } from "./icons";
 
 type Point = { lat: number; lng: number; address: string };
-// Which contact goes with the Property Lead: a match, a new Lead, or no one.
-type ContactChoice = { kind: "match"; id: string } | { kind: "new" } | { kind: "none" } | null;
+// Which Contact goes with the Property Lead: a match, or no one yet.
+type ContactChoice = { kind: "match"; id: string } | { kind: "none" } | null;
 type Status =
   | { kind: "review" }
   | { kind: "working" }
@@ -35,11 +33,11 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
   const [finding, setFinding] = useState(false);
   const [values, setValues] = useState(proposal.values);
   const c = proposal.contact;
-  const [choice, setChoice] = useState<ContactChoice>(c ? (c.recommended ? { kind: "match", id: c.recommended } : null) : { kind: "none" });
+  // A clear match starts chosen; with no Contact to offer, no one is linked.
+  const [choice, setChoice] = useState<ContactChoice>(
+    c?.recommended ? { kind: "match", id: c.recommended } : c?.candidates.length ? null : { kind: "none" },
+  );
   const [status, setStatus] = useState<Status>({ kind: "review" });
-  const [owner, setOwner] = useState<Proposal | null>(c?.newLead ?? null);
-  // After the owner's new Lead is saved: linked to the Property Lead, or why not.
-  const [ownerLink, setOwnerLink] = useState<string | null>(null);
 
   const working = status.kind === "working";
   const picked = choice?.kind === "match" ? c?.candidates.find((x) => x.id === choice.id) : undefined;
@@ -66,7 +64,7 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
     setStatus({ kind: "working" });
     try {
       const { lead } = await post<{ lead: PropertyLeadView }>("/api/property-lead/create", {
-        name: name.trim(), location, values, ...(picked?.linkable ? { linkContact: picked.id } : {}),
+        name: name.trim(), location, values, ...(picked ? { linkContact: picked.id } : {}),
       });
       setStatus({ kind: "created", lead });
     } catch (e) {
@@ -76,21 +74,6 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
 
   if (status.kind === "cancelled") return <div className="bubble app">Cancelled. No Property Lead was created.</div>;
 
-  // The owner's new Lead was saved: link it, where Property Contacts connects to Leads.
-  async function linkOwner(leadId: string, ownerId: string, ownerName: string) {
-    if (!c?.newLeadLinkable) {
-      setOwnerLink(`${ownerName} wasn't linked: Property Contacts in Monday doesn't connect to the Leads board. Link them in Monday once they're qualified, or add Vantage Leads to that column's connected boards.`);
-      return;
-    }
-    try {
-      const { lead } = await post<{ lead: PropertyLeadView }>("/api/property-lead/link", { itemId: leadId, contactId: ownerId });
-      setStatus({ kind: "created", lead });
-      setOwnerLink(`Linked ${ownerName} to the Property Lead.`);
-    } catch (e) {
-      setOwnerLink(`${ownerName} was saved, but not linked: ${(e as Error).message}`);
-    }
-  }
-
   if (status.kind === "created") {
     const lead = status.lead;
     return (
@@ -98,17 +81,12 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
         <div className="bubble app saved-bubble" role="status">
           <span className="tick"><Check /></span>
           <div>
-            <div><strong>Created {lead.name}.</strong> You&apos;re its Broker.{picked?.linkable ? ` Linked to ${picked.name}.` : ""}</div>
-            {picked && !picked.linkable && <div>{picked.name} wasn&apos;t linked: Property Contacts in Monday doesn&apos;t connect to the {picked.boardLabel}s board. Link them in Monday once they&apos;re a Contact, or add Vantage {picked.boardLabel}s to that column&apos;s connected boards.</div>}
-            {choice?.kind === "new" && c && !ownerLink && <div>Now add {c.name} as a new Lead below.{c.newLeadLinkable ? " They'll be linked to the Property Lead once saved." : ""}</div>}
-            {ownerLink && <div>{ownerLink}</div>}
+            <div><strong>Created {lead.name}.</strong> You&apos;re its Broker.{picked ? ` Linked to ${picked.name}.` : ""}</div>
+            {!picked && c && <div>No Contact was linked. Link {c.name} in Monday once they&apos;re in Contacts.</div>}
             <a className="open" href={lead.url} target="_blank" rel="noreferrer">Open in Monday <Out /></a>
           </div>
         </div>
-        <PropertyLeadCard key={`${lead.id}:${lead.contacts.length}`} lead={lead} justCreated />
-        {choice?.kind === "new" && owner && (
-          <ProposalCard proposal={owner} onReplace={setOwner} onSaved={(r) => linkOwner(lead.id, r.itemId, r.name)} />
-        )}
+        <PropertyLeadCard lead={lead} justCreated />
       </>
     );
   }
@@ -173,28 +151,26 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
       {c ? (
         <div className="candidates" role="radiogroup" aria-label="Contact">
           <div className="row-label" style={{ padding: "0 4px" }}>Contact: {c.name}</div>
+          {c.candidates.length === 0 && (
+            <p className="inline-msg" style={{ padding: "0 4px" }}>No Contact in Monday matches {c.name}. You can link the Contact in Monday later.</p>
+          )}
           {c.candidates.map((x) => (
-            <button key={`${x.board}:${x.id}`} role="radio" aria-checked={choice?.kind === "match" && choice.id === x.id}
+            <button key={x.id} role="radio" aria-checked={choice?.kind === "match" && choice.id === x.id}
               className={`candidate${choice?.kind === "match" && choice.id === x.id ? " recommended" : ""}`} disabled={working}
               onClick={() => setChoice({ kind: "match", id: x.id })}>
               <span className="c-text">
                 <span className="c-name">{x.name}</span>
-                <span className="c-detail">{x.boardLabel}{x.owner ? ` · ${x.owner}` : ""}</span>
+                <span className="c-detail">Contact{x.owner ? ` · ${x.owner}` : ""}</span>
                 <span className="c-why">Matched on: {x.matchedOn.join(", ")}</span>
-                {!x.linkable && <span className="c-why" style={{ color: "var(--notes-ink)" }}>Can&apos;t be linked: Property Contacts in Monday doesn&apos;t connect to the {x.boardLabel}s board.</span>}
                 {x.id === c.recommended && <span className="c-rec">Recommended</span>}
               </span>
             </button>
           ))}
-          <button role="radio" aria-checked={choice?.kind === "new"} className={`candidate new${choice?.kind === "new" ? " recommended" : ""}`} disabled={working} onClick={() => setChoice({ kind: "new" })}>
-            <span className="notice-icon" style={{ display: "flex" }}><Plus /></span>
-            <span className="c-text">
-              <span className="c-name">Create a new Lead for {c.name}</span>
-              <span className="c-detail">You&apos;ll approve the Lead after the Property Lead is created{c.newLeadLinkable ? ", then it's linked" : ". It can't be linked yet: Property Contacts doesn't connect to the Leads board"}</span>
-            </span>
-          </button>
           <button role="radio" aria-checked={choice?.kind === "none"} className={`candidate new${choice?.kind === "none" ? " recommended" : ""}`} disabled={working} onClick={() => setChoice({ kind: "none" })}>
-            <span className="c-text"><span className="c-name">Don&apos;t link anyone</span></span>
+            <span className="c-text">
+              <span className="c-name">Don&apos;t link anyone</span>
+              <span className="c-detail">Link the Contact in Monday later</span>
+            </span>
           </button>
         </div>
       ) : (

@@ -54,12 +54,11 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return data;
 }
 
-export function ProposalCard({ proposal, photos = [], attachByDefault = true, onReplace, onSaved }: {
+export function ProposalCard({ proposal, photos = [], attachByDefault = true, onReplace }: {
   proposal: Proposal;
   photos?: ShrunkPhoto[]; // sent with the note; attached to the record's Files on approval
   attachByDefault?: boolean;
   onReplace: (p: Proposal) => void;
-  onSaved?: (result: SaveResult) => void; // after Monday confirmed the save (e.g. to link a new owner Lead)
 }) {
   const [attach, setAttach] = useState(attachByDefault && photos.length > 0);
   const sign = proposal.extra?.signProperty;
@@ -255,7 +254,6 @@ export function ProposalCard({ proposal, photos = [], attachByDefault = true, on
     try {
       const { result, url } = await post<{ result: SaveResult; url: string }>("/api/save", request);
       setStatus({ kind: "saved", result, url });
-      onSaved?.(result);
     } catch (e) {
       const data = (e as { data?: { partial?: SaveResult; url?: string } }).data;
       setStatus({ kind: "failed", message: (e as Error).message, partial: data?.partial, url: data?.url });
