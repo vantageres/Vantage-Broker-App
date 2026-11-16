@@ -1,4 +1,4 @@
-# Session hand-off (Oct 14, 2026)
+# Session hand-off (Oct 14, 2026; updated Nov 16)
 
 What a new Claude Code session needs to pick up the Broker Assistant work. Read this with `product-spec-v1.md`, `build-plan.md` and `monday-test-boards.md`.
 
@@ -43,6 +43,16 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 - Undo test saves afterwards: reset Linda Park and delete any test Broker Notes.
   - Exception (Oct 14): John asked to keep Linda Park as she is after his capture test (Leasee, Healthcare and Office, 2,500 sf, $6,000, Moorestown, follow-up Oct 20, plus his Broker Note). Don't reset her unless he asks. His note says 2,000 sq ft and the field says 2,500 sf; not yet confirmed whether he edited it on the proposal.
 - Users: John Smyth `44432289` (tester and Operations Manager), Emily Stein `25374507` (second broker).
+
+## Starting the email monitor (planned Nov 16)
+
+A new feature: an email monitor, shown as a second tab on the home screen at brokers.vantageres.com (the Broker App is one tab, the email monitor the other). John has a spec for it and will share it at the start of that session.
+
+- **Same codebase.** It is a tab in this app, so it shares sign-in, the session, the Monday client (`src/lib/monday/`), the proposal and approval cards, hosting and the version check. Keep its own code apart: `src/app/email/`, `src/lib/email/`, `src/components/email/`.
+- **Its own branch.** Develop on `claude/email-monitor`, started from `claude/spec-review-planning-8omcwd`. Don't push email work to `claude/spec-review-planning-8omcwd` until John says it's ready: Vercel deploys that branch to brokers.vantageres.com, which the brokers use. Broker App fixes keep going to that branch meanwhile; bring them into the email branch with a merge.
+- **Testing.** Locally against the test boards (see "Seeing the live app from a session"). Vercel preview deployments for other branches can't sign in with Monday as set up (the Monday app's redirect URL and `APP_URL` point at brokers.vantageres.com).
+- **Agree first, then build.** Read John's spec, then settle with him before writing code: which mailbox (Microsoft 365/Outlook or Gmail; each broker's own inbox or a shared one), how the app connects and with what permissions, what "monitor" does (for example matching emails to Leads and Contacts, proposing Monday updates through the same approval cards, flagging follow-ups), and data handling. Email adds a new kind of data sent to Claude: keep the same rules as today (no training, no retention, nothing from prompts or answers in the app's logs; see "Claude API data settings" in `build-plan.md`). Write the agreed plan into `docs/` before building.
+- **The rules below still apply**: never print keys or tokens, write only to the test workspace from a session, nothing saved to Monday without the broker's approval.
 
 ## Next work, in order
 
