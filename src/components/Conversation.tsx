@@ -10,6 +10,9 @@ import type { SummaryPoint } from "@/lib/lookup/summary";
 import type { PropertyHit } from "@/lib/property/search";
 import type { PropertyLeadView } from "@/lib/property-leads/board";
 import { isQuestion } from "@/lib/lookup/question";
+import { asksForNewPropertyLead } from "@/lib/property-leads/intent";
+import type { NewPropertyLeadProposal } from "@/lib/property-leads/create";
+import { NewPropertyLeadCard } from "./NewPropertyLeadCard";
 import { propertyIntro } from "@/lib/property/intro";
 import { ProposalCard } from "./ProposalCard";
 import { LookupCard } from "./LookupCard";
@@ -28,6 +31,7 @@ type Entry =
   | { id: number; kind: "answer"; answer: LookupAnswer }
   | { id: number; kind: "property"; hit: PropertyHit }
   | { id: number; kind: "lead"; lead: PropertyLeadView }
+  | { id: number; kind: "newPropertyLead"; proposal: NewPropertyLeadProposal }
   | { id: number; kind: "attach"; photos: ShrunkPhoto[]; candidates: AttachCandidate[] }
   | { id: number; kind: "summary"; points: SummaryPoint[]; scope: string };
 
@@ -115,7 +119,9 @@ export function Conversation({ firstName }: { firstName: string }) {
   async function send(note: string, echo = true, mode: Mode = "auto", withPhotos: ShrunkPhoto[] = []) {
     if ((!note.trim() && !withPhotos.length) || busy) return;
     // A message with a photo is always read as a note, never as a question.
-    const asking = mode === "auto" && !withPhotos.length && isQuestion(note);
+    // Asking for a new Property Lead goes to its own reader, before any lookup.
+    const newPropertyLead = !withPhotos.length && asksForNewPropertyLead(note);
+    const asking = mode === "auto" && !withPhotos.length && !newPropertyLead && isQuestion(note);
     setBusy(true);
     const pendingId = nextId++;
     setEntries((e) => [
@@ -127,6 +133,11 @@ export function Conversation({ firstName }: { firstName: string }) {
     setPhotos([]);
     if (asking) {
       await ask(note, pendingId);
+      setBusy(false);
+      return;
+    }
+    if (newPropertyLead) {
+      await proposePropertyLead(note, pendingId);
       setBusy(false);
       return;
     }
@@ -166,6 +177,27 @@ export function Conversation({ firstName }: { firstName: string }) {
       ]);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // A new Property Lead to approve. Nothing is created until the broker does.
+  async function proposePropertyLead(note: string, pendingId: number) {
+    const done = (...add: Entry[]) => setEntries((e) => [...e.filter((x) => x.id !== pendingId), ...add]);
+    try {
+      const res = await fetch("/api/property-lead/new", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
+      const data = (await res.json().catch(() => ({}))) as { proposal?: NewPropertyLeadProposal; error?: string };
+      if (res.status === 401) {
+        window.location.href = "/signin";
+        return;
+      }
+      if (!res.ok || !data.proposal) throw new Error(data.error ?? "Something went wrong.");
+      done(
+        { id: nextId++, kind: "app", text: "Here's the Property Lead I'll create. Check the details and choose the contact." },
+        { id: nextId++, kind: "newPropertyLead", proposal: data.proposal },
+      );
+    } catch (err) {
+      const text = err instanceof TypeError ? "I couldn't reach the server. Check your connection and try again." : (err as Error).message;
+      done({ id: nextId++, kind: "app", text: `${text} Nothing was created.`, retry: note });
     }
   }
 
@@ -288,6 +320,8 @@ export function Conversation({ firstName }: { firstName: string }) {
               return <PropertyCard key={entry.id} hit={entry.hit} />;
             case "lead":
               return <PropertyLeadCard key={entry.id} lead={entry.lead} />;
+            case "newPropertyLead":
+              return <NewPropertyLeadCard key={entry.id} proposal={entry.proposal} />;
             case "attach":
               return <AttachCard key={entry.id} photos={entry.photos} candidates={entry.candidates} />;
             case "summary":

@@ -3,7 +3,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { BoardHidden, type MondayClient } from "../monday/client";
 import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../monday/boards";
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
-import { matchTerms } from "../matching";
+import { matchTerms, scoreRecord } from "../matching";
+import { extractPropertyLead, PropertyLeadDraft } from "../property-leads/extract";
+import { createPropertyLead, type ContactOption, type CreatePropertyLeadRequest, type NewPropertyLeadProposal } from "../property-leads/create";
 import { findBroker, teamFor, type Team } from "../monday/team";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
@@ -361,4 +363,74 @@ export async function findPlace(place: string) {
 
 export function itemUrl(accountSlug: string, board: "leads" | "contacts", itemId: string) {
   return `https://${accountSlug}.monday.com/boards/${BOARDS[board].boardId}/pulses/${itemId}`;
+}
+
+// A new Property Lead from a note: the property's values, the address on the
+// map, and the closest matches for the contact it names (Contacts first), with
+// a new-Lead proposal for them in case none is right.
+const CONTACT_CHOICES = 5;
+
+export async function newPropertyLead(ctx: Context, note: string): Promise<NewPropertyLeadProposal> {
+  const today = todayInNewJersey();
+  const team = teamOrNull(ctx.monday);
+  // Development only: a saved reading stands in for Claude (DEV_PROPERTY_LEAD_FILE).
+  const devFile = process.env.NODE_ENV !== "production" ? process.env.DEV_PROPERTY_LEAD_FILE : undefined;
+  const draft = devFile ? PropertyLeadDraft.parse(JSON.parse(readFileSync(devFile, "utf8"))) : await extractPropertyLead(claude(), note, today);
+  const questions = draft.uncertain.map((u) => ({ field: u.field, question: u.question }));
+
+  let location: NewPropertyLeadProposal["location"] = null;
+  let locationProblem: string | undefined;
+  if (draft.address) {
+    const geocode = geocoder();
+    if (!geocode) locationProblem = "Map lookup isn't set up, so Location is left empty.";
+    else {
+      try {
+        const point = await geocode(draft.address);
+        if (point && !point.partial) location = { lat: point.lat, lng: point.lng, address: point.address };
+        else locationProblem = point
+          ? `The map only partly matched "${draft.address}" (${point.address}), so Location is left empty.`
+          : `"${draft.address}" wasn't found on the map, so Location is left empty.`;
+      } catch {
+        locationProblem = "The map didn't answer, so Location is left empty.";
+      }
+    }
+  }
+
+  let contact: NewPropertyLeadProposal["contact"] = null;
+  const c = draft.contact;
+  if (c && (c.name || c.business_name)) {
+    const query = { name: c.name, businessName: c.business_name, phones: c.phones, emails: c.emails };
+    const records = await peopleMatching(ctx.monday, ctx.accountSlug, matchTerms([query]));
+    const ranked = records
+      .map((r) => ({ r, scored: scoreRecord(query, r) }))
+      .sort((a, b) => (b.scored?.score ?? 0) - (a.scored?.score ?? 0) || (a.r.board.key === "contacts" ? -1 : 1))
+      .slice(0, CONTACT_CHOICES);
+    const candidates: ContactOption[] = ranked.map(({ r, scored }) => ({
+      board: r.board.key, boardLabel: r.board.label, id: r.id, name: r.name, url: r.url, owner: r.contactBrokerNames,
+      matchedOn: scored?.reasons ?? ["similar name"], linkable: r.board.key === "contacts",
+    }));
+    const top = ranked[0];
+    const recommended = top?.scored && top.scored.score >= 60 && top.r.board.key === "contacts" ? top.r.id : undefined;
+    const newLead = withAssign(proposalFor({ ...c, qualify: false }, null, ctx.me, note, today), await team, ctx.me);
+    contact = { name: c.name ?? c.business_name ?? "", candidates, ...(recommended ? { recommended } : {}), newLead: await withMap(newLead) };
+  }
+
+  return {
+    noteText: note,
+    name: draft.address ?? "",
+    location,
+    ...(locationProblem ? { locationProblem } : {}),
+    values: {
+      ...(draft.listing_type ? { listingType: draft.listing_type } : {}),
+      ...(draft.property_type ? { propertyType: draft.property_type } : {}),
+      ...(draft.listing_price ? { listingPrice: draft.listing_price } : {}),
+      ...(draft.size ? { sizeAvailable: draft.size } : {}),
+    },
+    questions,
+    contact,
+  };
+}
+
+export function saveNewPropertyLead(ctx: Context, request: CreatePropertyLeadRequest) {
+  return createPropertyLead(ctx.monday, PROPERTY_LEADS_BOARD, BOARDS.contacts.boardId, ctx.me, request, ctx.accountSlug);
 }

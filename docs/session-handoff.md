@@ -29,7 +29,7 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 - To check behaviour, a session runs the app locally against the test boards:
   - `NODE_USE_ENV_PROXY=1 npx next dev`, with `MONDAY_DEV_PROXY_AUTH=1` in `.env.local`
   - the network secret adds the Monday token
-  - drive it with Playwright using `executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"`
+  - drive it with Playwright using `the Chromium under `/opt/pw-browsers` (the folder name changes between containers; Nov 16: `chromium-1243/chrome-linux64/chrome`)`
 - `.env.local` is gitignored. A new session needs `SESSION_SECRET` (any 32+ characters), `MONDAY_DEV_PROXY_AUTH=1`, and optionally `DEV_EXTRACTION_FILE` (a saved extraction JSON used instead of calling Claude).
 - The Claude key is not in this environment, so local capture uses the saved extraction.
 - John's Windows PC (`C:\Claude Projects\Vantage Broker App`) reaches the test boards with John's personal Monday token, `MONDAY_DEV_TOKEN` in `.env.local` (added Oct 14; never print it). "Development sign-in" and the scripts use it, and while it is in use any write outside the Broker App Test workspace is refused in code (`testWorkspaceOnly` in `src/lib/monday/client.ts`). Ask questions with `npx tsx --env-file=.env.local scripts/try-lookup.ts "question"`. The npm scripts that set variables don't run in Windows' default shell; run `npx next dev` directly.
@@ -63,7 +63,8 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
    - The Leads automation that resets Follow Up Date when a note is added.
    - Adding the six-month follow-up automation to Contacts Test.
    - Vantage domain: brokers.vantageres.com set up Nov 5 (see "Where things stand"). Sign-in works there (Nov 5). Optionally redirect the old vercel.app address to it in Vercel → Domains.
-12. **Assigning new Leads** (built Nov 6; see `build-plan.md`). Needs the `teams:read` scope first (see above). Then Andrea to try on the live site: add a Lead from a call, choose the broker from the Brokers team, approve, and check the Lead in Monday.
-13. **Add the brokers to Vantage Properties New** (John, in Monday). It is private with only John on it, so other brokers' property searches skip it (the app now says so instead of failing).
-14. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Confirmed by John on the live site Nov 5 (Kristin Smyth moved to Contacts with her fields and notes). Still to check with a Lead that has them: that Business Name and Files carry over (spec item 5 for the automation).
-15. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
+12. **Creating Property Leads** (built Nov 16; see `build-plan.md`). John to try on the live site: "New Property Lead: <address>. Owner <name> wants to sell…", choose the contact, approve, check it in Monday. Not yet run through real Claude (the session's key needs updating in the cloud environment's settings).
+13. **Assigning new Leads** (built Nov 6; see `build-plan.md`). Needs the `teams:read` scope first (see above). Then Andrea to try on the live site: add a Lead from a call, choose the broker from the Brokers team, approve, and check the Lead in Monday.
+14. **Add the brokers to Vantage Properties New** (John, in Monday). It is private with only John on it, so other brokers' property searches skip it (the app now says so instead of failing).
+15. **Qualifying a Lead** (built Nov 5; see `build-plan.md`). Confirmed by John on the live site Nov 5 (Kristin Smyth moved to Contacts with her fields and notes). Still to check with a Lead that has them: that Business Name and Files carry over (spec item 5 for the automation).
+16. **Phase 3** (spec): vantageres.com listings, "what changed this week". Property search, requirement summaries, listings for a person, and Property Leads lookup and edit are done (items 4 to 6).
