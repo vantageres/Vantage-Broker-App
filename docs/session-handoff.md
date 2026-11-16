@@ -48,6 +48,8 @@ What a new Claude Code session needs to pick up the Broker Assistant work. Read 
 
 A new feature: an email monitor, shown as a second tab on the home screen at brokers.vantageres.com (the Broker App is one tab, the email monitor the other). John has a spec for it and will share it at the start of that session.
 
+**Agreed plan (Nov 16): `email-monitor-plan.md`.** Read it first; it records John's decisions and the build order.
+
 - **Same codebase.** It is a tab in this app, so it shares sign-in, the session, the Monday client (`src/lib/monday/`), the proposal and approval cards, hosting and the version check. Keep its own code apart: `src/app/email/`, `src/lib/email/`, `src/components/email/`.
 - **Its own branch.** Develop on `claude/email-monitor`, started from `claude/spec-review-planning-8omcwd`. Don't push email work to `claude/spec-review-planning-8omcwd` until John says it's ready: Vercel deploys that branch to brokers.vantageres.com, which the brokers use. Broker App fixes keep going to that branch meanwhile; bring them into the email branch with a merge.
 - **Testing.** Locally against the test boards (see "Seeing the live app from a session"). Vercel preview deployments for other branches can't sign in with Monday as set up (the Monday app's redirect URL and `APP_URL` point at brokers.vantageres.com).
