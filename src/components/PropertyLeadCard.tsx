@@ -25,16 +25,20 @@ type Status =
   | { kind: "saved"; changed: number; automations: boolean }
   | { kind: "failed"; message: string; refused: boolean };
 
+// The fields shown for a Property Lead that was just created: what a broker
+// knows at the start. Dates, loan details and the folder status come later.
+const JUST_CREATED: LeadField[] = ["status", "listingType", "propertyType", "listingPrice", "sizeAvailable"];
+
 // A Property Lead, read from Monday. Its Broker, Co-Broker and Co-Broker2 can
 // tap a value to change it; nothing is saved until they approve the changes.
-export function PropertyLeadCard({ lead: initial }: { lead: PropertyLeadView }) {
+export function PropertyLeadCard({ lead: initial, justCreated = false }: { lead: PropertyLeadView; justCreated?: boolean }) {
   const [lead, setLead] = useState(initial);
   const [edits, setEdits] = useState<Partial<Record<LeadField, string>>>({});
   const [editing, setEditing] = useState<LeadField | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   const owners = [lead.brokers.broker, lead.brokers.coBroker, lead.brokers.coBroker2].filter(Boolean).join(", ");
-  const shown = FIELDS.filter((f) => f.field in lead.values);
+  const shown = FIELDS.filter((f) => f.field in lead.values && (!justCreated || JUST_CREATED.includes(f.field)));
   const current = (f: LeadField) => lead.values[f] ?? "";
   const changes: LeadChange[] = shown
     .filter((f) => edits[f.field] !== undefined && edits[f.field] !== current(f.field))
@@ -90,7 +94,7 @@ export function PropertyLeadCard({ lead: initial }: { lead: PropertyLeadView }) 
     { label: "In Marketing Date", value: day(lead.info.inMarketing) },
     { label: "On Market Date", value: day(lead.info.onMarket) },
     { label: "GEN FOLDER LA", value: lead.info.genFolder },
-  ].filter((r) => r.value);
+  ].filter((r) => r.value && (!justCreated || r.label === "Location"));
 
   return (
     <article className="card lookup" aria-label={`Property Lead ${lead.name}`}>
@@ -161,7 +165,7 @@ export function PropertyLeadCard({ lead: initial }: { lead: PropertyLeadView }) 
         <section className="lookup-section">
           <h3>Linked</h3>
           <ul className="lookup-props">
-            {lead.contacts.map((c) => <li key={c.url}><a href={c.url} target="_blank" rel="noreferrer">{c.name} (Vantage Contact) <Out /></a></li>)}
+            {lead.contacts.map((c) => <li key={c.url}><a href={c.url} target="_blank" rel="noreferrer">{c.name} <Out /></a></li>)}
             {lead.info.folderUrl && <li><a href={lead.info.folderUrl} target="_blank" rel="noreferrer">Property Folder <Out /></a></li>}
           </ul>
         </section>

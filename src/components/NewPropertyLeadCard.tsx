@@ -38,6 +38,8 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
   const [choice, setChoice] = useState<ContactChoice>(c ? (c.recommended ? { kind: "match", id: c.recommended } : null) : { kind: "none" });
   const [status, setStatus] = useState<Status>({ kind: "review" });
   const [owner, setOwner] = useState<Proposal | null>(c?.newLead ?? null);
+  // After the owner's new Lead is saved: linked to the Property Lead, or why not.
+  const [ownerLink, setOwnerLink] = useState<string | null>(null);
 
   const working = status.kind === "working";
   const picked = choice?.kind === "match" ? c?.candidates.find((x) => x.id === choice.id) : undefined;
@@ -74,6 +76,21 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
 
   if (status.kind === "cancelled") return <div className="bubble app">Cancelled. No Property Lead was created.</div>;
 
+  // The owner's new Lead was saved: link it, where Property Contacts connects to Leads.
+  async function linkOwner(leadId: string, ownerId: string, ownerName: string) {
+    if (!c?.newLeadLinkable) {
+      setOwnerLink(`${ownerName} wasn't linked: Property Contacts in Monday doesn't connect to the Leads board. Link them in Monday once they're qualified, or add Vantage Leads to that column's connected boards.`);
+      return;
+    }
+    try {
+      const { lead } = await post<{ lead: PropertyLeadView }>("/api/property-lead/link", { itemId: leadId, contactId: ownerId });
+      setStatus({ kind: "created", lead });
+      setOwnerLink(`Linked ${ownerName} to the Property Lead.`);
+    } catch (e) {
+      setOwnerLink(`${ownerName} was saved, but not linked: ${(e as Error).message}`);
+    }
+  }
+
   if (status.kind === "created") {
     const lead = status.lead;
     return (
@@ -82,13 +99,16 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
           <span className="tick"><Check /></span>
           <div>
             <div><strong>Created {lead.name}.</strong> You&apos;re its Broker.{picked?.linkable ? ` Linked to ${picked.name}.` : ""}</div>
-            {picked && !picked.linkable && <div>{picked.name} is a Lead, so they weren&apos;t linked. Property Contacts links only to Contacts: link them in Monday once they&apos;re qualified.</div>}
-            {choice?.kind === "new" && c && <div>Now add {c.name} as a new Lead below. Once they&apos;re qualified to Contacts, link them in Monday.</div>}
+            {picked && !picked.linkable && <div>{picked.name} wasn&apos;t linked: Property Contacts in Monday doesn&apos;t connect to the {picked.boardLabel}s board. Link them in Monday once they&apos;re a Contact, or add Vantage {picked.boardLabel}s to that column&apos;s connected boards.</div>}
+            {choice?.kind === "new" && c && !ownerLink && <div>Now add {c.name} as a new Lead below.{c.newLeadLinkable ? " They'll be linked to the Property Lead once saved." : ""}</div>}
+            {ownerLink && <div>{ownerLink}</div>}
             <a className="open" href={lead.url} target="_blank" rel="noreferrer">Open in Monday <Out /></a>
           </div>
         </div>
-        <PropertyLeadCard lead={lead} />
-        {choice?.kind === "new" && owner && <ProposalCard proposal={owner} onReplace={setOwner} />}
+        <PropertyLeadCard key={`${lead.id}:${lead.contacts.length}`} lead={lead} justCreated />
+        {choice?.kind === "new" && owner && (
+          <ProposalCard proposal={owner} onReplace={setOwner} onSaved={(r) => linkOwner(lead.id, r.itemId, r.name)} />
+        )}
       </>
     );
   }
@@ -161,7 +181,7 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
                 <span className="c-name">{x.name}</span>
                 <span className="c-detail">{x.boardLabel}{x.owner ? ` · ${x.owner}` : ""}</span>
                 <span className="c-why">Matched on: {x.matchedOn.join(", ")}</span>
-                {!x.linkable && <span className="c-why">A Lead: Property Contacts links only to Contacts, so they won&apos;t be linked yet.</span>}
+                {!x.linkable && <span className="c-why" style={{ color: "var(--notes-ink)" }}>Can&apos;t be linked: Property Contacts in Monday doesn&apos;t connect to the {x.boardLabel}s board.</span>}
                 {x.id === c.recommended && <span className="c-rec">Recommended</span>}
               </span>
             </button>
@@ -170,7 +190,7 @@ export function NewPropertyLeadCard({ proposal }: { proposal: NewPropertyLeadPro
             <span className="notice-icon" style={{ display: "flex" }}><Plus /></span>
             <span className="c-text">
               <span className="c-name">Create a new Lead for {c.name}</span>
-              <span className="c-detail">You&apos;ll approve the Lead after the Property Lead is created</span>
+              <span className="c-detail">You&apos;ll approve the Lead after the Property Lead is created{c.newLeadLinkable ? ", then it's linked" : ". It can't be linked yet: Property Contacts doesn't connect to the Leads board"}</span>
             </span>
           </button>
           <button role="radio" aria-checked={choice?.kind === "none"} className={`candidate new${choice?.kind === "none" ? " recommended" : ""}`} disabled={working} onClick={() => setChoice({ kind: "none" })}>

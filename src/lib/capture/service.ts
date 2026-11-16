@@ -5,7 +5,7 @@ import { LIVE_BOARDS, TEST_BOARDS, USE_LIVE_BOARDS, type PersonBoard } from "../
 import { loadPersonRecord, loadPersonRecords, recordsContaining, searchPersonRecords, type PersonRecord, type SearchTerms } from "../monday/records";
 import { matchTerms, scoreRecord } from "../matching";
 import { contactAsPerson, extractPropertyLead, PropertyLeadDraft } from "../property-leads/extract";
-import { createPropertyLead, type ContactOption, type CreatePropertyLeadRequest, type NewPropertyLeadProposal } from "../property-leads/create";
+import { createPropertyLead, linkableBoards, linkPropertyContact, type ContactOption, type CreatePropertyLeadRequest, type NewPropertyLeadProposal } from "../property-leads/create";
 import { findBroker, teamFor, type Team } from "../monday/team";
 import { googleGeocoder, resolveLocations, type Geocoder } from "../geocode";
 import { SavedExtraction, extractPeople, type ExtractedPerson, type Photo, type PhotoReport } from "./extract";
@@ -373,6 +373,8 @@ const CONTACT_CHOICES = 5;
 export async function newPropertyLead(ctx: Context, note: string): Promise<NewPropertyLeadProposal> {
   const today = todayInNewJersey();
   const team = teamOrNull(ctx.monday);
+  // Which boards Property Contacts connects to (Contacts, and Leads if added in Monday).
+  const linkBoards = linkableBoards(ctx.monday, PROPERTY_LEADS_BOARD).catch(() => [] as string[]);
   // Development only: a saved reading stands in for Claude (DEV_PROPERTY_LEAD_FILE).
   const devFile = process.env.NODE_ENV !== "production" ? process.env.DEV_PROPERTY_LEAD_FILE : undefined;
   const draft = devFile ? PropertyLeadDraft.parse(JSON.parse(readFileSync(devFile, "utf8"))) : await extractPropertyLead(claude(), note, today);
@@ -405,14 +407,18 @@ export async function newPropertyLead(ctx: Context, note: string): Promise<NewPr
       .map((r) => ({ r, scored: scoreRecord(query, r) }))
       .sort((a, b) => (b.scored?.score ?? 0) - (a.scored?.score ?? 0) || (a.r.board.key === "contacts" ? -1 : 1))
       .slice(0, CONTACT_CHOICES);
+    const boards = await linkBoards;
     const candidates: ContactOption[] = ranked.map(({ r, scored }) => ({
       board: r.board.key, boardLabel: r.board.label, id: r.id, name: r.name, url: r.url, owner: r.contactBrokerNames,
-      matchedOn: scored?.reasons ?? ["similar name"], linkable: r.board.key === "contacts",
+      matchedOn: scored?.reasons ?? ["similar name"], linkable: boards.includes(r.board.boardId),
     }));
     const top = ranked[0];
-    const recommended = top?.scored && top.scored.score >= 60 && top.r.board.key === "contacts" ? top.r.id : undefined;
+    const recommended = top?.scored && top.scored.score >= 60 && boards.includes(top.r.board.boardId) ? top.r.id : undefined;
     const newLead = withAssign(proposalFor(contactAsPerson(c), null, ctx.me, note, today), await team, ctx.me);
-    contact = { name: c.name ?? c.business_name ?? "", candidates, ...(recommended ? { recommended } : {}), newLead: await withMap(newLead) };
+    contact = {
+      name: c.name ?? c.business_name ?? "", candidates, ...(recommended ? { recommended } : {}),
+      newLead: await withMap(newLead), newLeadLinkable: boards.includes(BOARDS.leads.boardId),
+    };
   }
 
   return {
@@ -432,5 +438,9 @@ export async function newPropertyLead(ctx: Context, note: string): Promise<NewPr
 }
 
 export function saveNewPropertyLead(ctx: Context, request: CreatePropertyLeadRequest) {
-  return createPropertyLead(ctx.monday, PROPERTY_LEADS_BOARD, BOARDS.contacts.boardId, ctx.me, request, ctx.accountSlug);
+  return createPropertyLead(ctx.monday, PROPERTY_LEADS_BOARD, ctx.me, request, ctx.accountSlug);
+}
+
+export function linkContactToPropertyLead(ctx: Context, itemId: string, contactId: string) {
+  return linkPropertyContact(ctx.monday, PROPERTY_LEADS_BOARD, ctx.me, itemId, contactId, ctx.accountSlug);
 }

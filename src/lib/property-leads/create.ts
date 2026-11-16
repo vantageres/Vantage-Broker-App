@@ -1,4 +1,5 @@
 import type { MondayClient } from "../monday/client";
+import type { PersonBoard } from "../monday/boards";
 import { SaveRefused, type Me } from "../monday/write";
 import type { Proposal } from "../capture/proposal";
 import { LEAD_PROPERTY_TYPES, LISTING_TYPES } from "./fields";
@@ -16,8 +17,8 @@ export interface ContactOption {
   url: string;
   owner: string;
   matchedOn: string[];
-  // Property Contacts links to the Contacts board only, so a Lead can't be
-  // linked until it is qualified.
+  // Property Contacts links only to the boards its Monday settings connect
+  // (today, Contacts only): a record on another board can't be linked yet.
   linkable: boolean;
 }
 
@@ -34,7 +35,58 @@ export interface NewPropertyLeadProposal {
     candidates: ContactOption[]; // closest matches, Contacts first
     recommended?: string; // a Contact that clearly matches
     newLead: Proposal; // to add them as a new Lead instead
+    newLeadLinkable: boolean; // a new Lead can be linked once saved (Property Contacts connects to Leads)
   };
+}
+
+// Which boards the Property Contacts column connects to, from its settings
+// in Monday. Read fresh before every link.
+export async function linkableBoards(monday: MondayClient, board: LeadBoard): Promise<string[]> {
+  const data = await monday.query<{ boards: { columns: { settings_str: string }[] }[] }>(
+    `query ($board: [ID!], $col: [String!]) { boards(ids: $board) { columns(ids: $col) { settings_str } } }`,
+    { board: [board.boardId], col: [board.info.contact] },
+  );
+  try {
+    const settings = JSON.parse(data.boards?.[0]?.columns?.[0]?.settings_str ?? "{}") as { boardIds?: (number | string)[] };
+    return (settings.boardIds ?? []).map(String);
+  } catch {
+    return [];
+  }
+}
+
+// Says why a record can't be linked, naming the board it's on.
+export function notLinkableReason(board: Pick<PersonBoard, "key">): string {
+  return `Property Contacts in Monday doesn't connect to the ${board.key === "leads" ? "Leads" : "Contacts"} board, so this record can't be linked yet.`;
+}
+
+// The record must be on a board Property Contacts connects to. Returns its id.
+async function checkLinkable(monday: MondayClient, board: LeadBoard, id: string): Promise<string> {
+  if (!/^\d+$/.test(id)) throw new SaveRefused("That contact can't be linked.");
+  const [found, boards] = await Promise.all([
+    monday.query<{ items: { board: { id: string } }[] }>(`query ($id: [ID!]) { items(ids: $id) { board { id } } }`, { id: [id] }),
+    linkableBoards(monday, board),
+  ]);
+  if (!boards.includes(String(found.items[0]?.board.id))) throw new SaveRefused("Property Contacts in Monday doesn't connect to that record's board, so it can't be linked.");
+  return id;
+}
+
+// Adds a record to a Property Lead's Property Contacts (a new owner Lead,
+// once saved). Only the Property Lead's brokers can; links already there stay.
+export async function linkPropertyContact(monday: MondayClient, board: LeadBoard, me: Me, itemId: string, contactId: string, accountSlug: string): Promise<PropertyLeadRecord> {
+  await readOwnedLead(monday, board, me, itemId, accountSlug);
+  const id = await checkLinkable(monday, board, String(contactId));
+  const current = await monday.query<{ items: { column_values: { linked_item_ids?: string[] }[] }[] }>(
+    `query ($id: [ID!], $col: [String!]) { items(ids: $id) { column_values(ids: $col) { ... on BoardRelationValue { linked_item_ids } } } }`,
+    { id: [itemId], col: [board.info.contact] },
+  );
+  const ids = current.items[0]?.column_values[0]?.linked_item_ids ?? [];
+  if (!ids.includes(id)) {
+    await monday.query(
+      `mutation ($board: ID!, $item: ID!, $values: JSON!) { change_multiple_column_values(board_id: $board, item_id: $item, column_values: $values) { id } }`,
+      { board: board.boardId, item: itemId, values: JSON.stringify({ [board.info.contact]: { item_ids: [...ids, id].map(Number) } }) },
+    );
+  }
+  return readOwnedLead(monday, board, me, itemId, accountSlug);
 }
 
 export interface CreatePropertyLeadRequest {
@@ -49,7 +101,6 @@ const TEXT_MAX = 200;
 export async function createPropertyLead(
   monday: MondayClient,
   board: LeadBoard,
-  contactsBoardId: string,
   me: Me,
   request: CreatePropertyLeadRequest,
   accountSlug: string,
@@ -80,11 +131,7 @@ export async function createPropertyLead(
     columnValues[board.info.location] = { lat: String(loc.lat), lng: String(loc.lng), address: loc.address };
   }
   if (request.linkContact) {
-    const id = String(request.linkContact);
-    if (!/^\d+$/.test(id)) throw new SaveRefused("That contact can't be linked.");
-    const found = await monday.query<{ items: { board: { id: string } }[] }>(`query ($id: [ID!]) { items(ids: $id) { board { id } } }`, { id: [id] });
-    if (String(found.items[0]?.board.id) !== contactsBoardId) throw new SaveRefused("Property Contacts links only to records on the Contacts board.");
-    columnValues[board.info.contact] = { item_ids: [Number(id)] };
+    columnValues[board.info.contact] = { item_ids: [Number(await checkLinkable(monday, board, String(request.linkContact)))] };
   }
 
   const created = await monday.query<{ create_item: { id: string } }>(

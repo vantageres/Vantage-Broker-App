@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MondayClient } from "../monday/client";
 import { TEST_PROPERTY_LEADS } from "./board";
-import { createPropertyLead } from "./create";
+import { createPropertyLead, linkPropertyContact } from "./create";
 import { asksForNewPropertyLead } from "./intent";
 
 const ME = { id: "1", name: "John Smyth" };
@@ -17,6 +17,7 @@ function fakeMonday(contactBoard = CONTACTS) {
         mutations.push(JSON.parse(vars.values as string));
         return { create_item: { id: "900" } } as T;
       }
+      if (query.includes("settings_str")) return { boards: [{ columns: [{ settings_str: JSON.stringify({ boardIds: [Number(CONTACTS)] }) }] }] } as T;
       if (!query.includes("column_values")) return { items: [{ board: { id: contactBoard } }] } as T;
       return { items: [{ id: "900", name: "140 Main St, Moorestown, NJ", updated_at: "", board: { id: b.boardId }, column_values: [
         { id: b.info.broker, text: "John Smyth", value: JSON.stringify({ personsAndTeams: [{ id: 1, kind: "person" }] }) },
@@ -29,7 +30,7 @@ function fakeMonday(contactBoard = CONTACTS) {
 describe("creating a Property Lead", () => {
   it("makes the broker its Broker, with the values and the linked Contact", async () => {
     const { client, mutations } = fakeMonday();
-    const record = await createPropertyLead(client, b, CONTACTS, ME, {
+    const record = await createPropertyLead(client, b, ME, {
       name: "140 Main St, Moorestown, NJ",
       location: { lat: 39.96, lng: -74.95, address: "140 Main St, Moorestown, NJ 08057, USA" },
       values: { listingType: "Sale", propertyType: "Industrial/Flex", listingPrice: "$1,800,000", sizeAvailable: "12,000 sf" },
@@ -54,15 +55,15 @@ describe("creating a Property Lead", () => {
       [{ name: "1 A St", values: { propertyType: "Warehouse" } }, '"Warehouse" is not a Property Type option.'],
     ] as const) {
       const { client, mutations } = fakeMonday();
-      await expect(createPropertyLead(client, b, CONTACTS, ME, request, "acct")).rejects.toThrow(message);
+      await expect(createPropertyLead(client, b, ME, request, "acct")).rejects.toThrow(message);
       expect(mutations).toEqual([]);
     }
   });
 
   it("links only records on the Contacts board", async () => {
     const { client, mutations } = fakeMonday("leads-board");
-    await expect(createPropertyLead(client, b, CONTACTS, ME, { name: "1 A St", values: {}, linkContact: "77" }, "acct"))
-      .rejects.toThrow("Property Contacts links only to records on the Contacts board.");
+    await expect(createPropertyLead(client, b, ME, { name: "1 A St", values: {}, linkContact: "77" }, "acct"))
+      .rejects.toThrow("Property Contacts in Monday doesn't connect to that record's board, so it can't be linked.");
     expect(mutations).toEqual([]);
   });
 });
@@ -98,5 +99,40 @@ describe("the Property Lead answer format", () => {
     };
     walk((betaZodOutputFormat(PropertyLeadDraft) as { schema: unknown }).schema);
     expect(unions).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("linking a new owner Lead", () => {
+  // Property Contacts connects to Contacts and, once added in Monday, Leads.
+  function linkMonday(connected: string[], linked: string[] = []) {
+    const mutations: Record<string, unknown>[] = [];
+    const client: MondayClient = {
+      async query<T>(query: string, vars: Record<string, unknown> = {}) {
+        if (query.trim().startsWith("mutation")) {
+          mutations.push(JSON.parse(vars.values as string));
+          return {} as T;
+        }
+        if (query.includes("settings_str")) return { boards: [{ columns: [{ settings_str: JSON.stringify({ boardIds: connected.map(Number) }) }] }] } as T;
+        if (query.includes("linked_item_ids")) return { items: [{ column_values: [{ linked_item_ids: linked }] }] } as T;
+        if (!query.includes("column_values")) return { items: [{ board: { id: "222" } }] } as T; // the owner is on Leads (222)
+        return { items: [{ id: "900", name: "30 Jackson Rd", updated_at: "", board: { id: b.boardId }, column_values: [
+          { id: b.info.broker, text: "John Smyth", value: JSON.stringify({ personsAndTeams: [{ id: 1, kind: "person" }] }) },
+        ] }] } as T;
+      },
+    };
+    return { client, mutations };
+  }
+
+  it("adds the Lead, keeping links already there, when Property Contacts connects to Leads", async () => {
+    const { client, mutations } = linkMonday([CONTACTS, "222"], ["77"]);
+    await linkPropertyContact(client, b, ME, "900", "88", "acct");
+    expect(mutations).toEqual([{ [b.info.contact]: { item_ids: [77, 88] } }]);
+  });
+
+  it("refuses when Property Contacts doesn't connect to Leads", async () => {
+    const { client, mutations } = linkMonday([CONTACTS]);
+    await expect(linkPropertyContact(client, b, ME, "900", "88", "acct"))
+      .rejects.toThrow("Property Contacts in Monday doesn't connect to that record's board, so it can't be linked.");
+    expect(mutations).toEqual([]);
   });
 });
