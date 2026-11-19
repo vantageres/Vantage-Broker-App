@@ -21,14 +21,6 @@ export function HomeTabs({ firstName, startOn, outcome }: { firstName: string; s
 
   return (
     <>
-      <nav className="home-tabs" role="tablist" aria-label="Home">
-        <button type="button" role="tab" aria-selected={tab === "assistant"} className="home-tab" onClick={() => choose("assistant")}>
-          Assistant
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "email"} className="home-tab" onClick={() => choose("email")}>
-          Email
-        </button>
-      </nav>
       <div hidden={tab !== "assistant"} style={{ display: tab === "assistant" ? "contents" : "none" }}>
         <Conversation firstName={firstName} />
       </div>
@@ -37,6 +29,17 @@ export function HomeTabs({ firstName, startOn, outcome }: { firstName: string; s
           <EmailTab outcome={tab === "email" ? outcome : undefined} />
         </div>
       )}
+      {/* A footer, so the switch stays in reach while the broker scrolls. */}
+      <nav className="home-tabs" role="tablist" aria-label="Home">
+        <button type="button" role="tab" aria-selected={tab === "assistant"} className="home-tab" onClick={() => choose("assistant")}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+          Assistant
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "email"} className="home-tab" onClick={() => choose("email")}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+          Email
+        </button>
+      </nav>
     </>
   );
 }
