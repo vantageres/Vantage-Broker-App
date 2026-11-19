@@ -1,0 +1,22 @@
+{
+  "contacts": [
+    { "email": "tom@alvarezholdings.example", "name": "Tom Alvarez", "company": "Alvarez Holdings", "bin": "Client", "related_deal": "1200 Commerce Pkwy", "why": "Owner asking the broker to lease his properties.", "confidence": "high" },
+    { "email": "linda@parkmedical.example", "name": "Linda Park", "company": "Park Medical", "bin": "Prospect", "related_deal": null, "why": "Looking for a second medical office location.", "confidence": "high" },
+    { "email": "sarah.kim@jll.example", "name": "Sarah Kim", "company": "JLL", "bin": "Outside Broker", "related_deal": "22 Elm St", "why": "JLL broker with a tenant for 22 Elm St.", "confidence": "high" },
+    { "email": "shots@sjphoto.example", "name": null, "company": "South Jersey Photo", "bin": "Vendor", "related_deal": null, "why": "Photographer for listings.", "confidence": "high" },
+    { "email": "dave.reyes@garrisonfoods.example", "name": "Dave Reyes", "company": "Garrison Foods", "bin": "Prospect", "related_deal": null, "why": "Needs 15,000 to 20,000 sf warehouse near I-295.", "confidence": "high" },
+    { "email": "mike.ruiz@cbre.example", "name": "Mike Ruiz", "company": "CBRE", "bin": "Outside Broker", "related_deal": "22 Elm St", "why": "CBRE broker sending an LOI on 22 Elm St.", "confidence": "high" },
+    { "email": "owen@grayfamilyprops.example", "name": "Owen Gray", "company": "Gray Family Properties", "bin": "Client", "related_deal": null, "why": "Owner asking what his Haddonfield building is worth.", "confidence": "low" },
+    { "email": "npatel@firstbank.example", "name": "Nina Patel", "company": "First Bank", "bin": "Lender", "related_deal": "77 Route 73", "why": "Lender with a term sheet for 77 Route 73.", "confidence": "high" },
+    { "email": "gmoss@mosslaw.example", "name": "Greg Moss", "company": "Moss Law", "bin": "Attorney", "related_deal": "510 Main St", "why": "Reviewing the 510 Main St LOI and title.", "confidence": "high" },
+    { "email": "vwisher@hillwallack.example", "name": "Valerie Wisher", "company": "Hill Wallack", "bin": "Attorney", "related_deal": "510 Main St", "why": "Sent the 510 Main St draft lease.", "confidence": "high" },
+    { "email": "alex.rivera@gmail.example", "name": "Alex Rivera", "company": null, "bin": "Personal", "related_deal": null, "why": "Dinner plans, personal address.", "confidence": "high" }
+  ],
+  "properties": [
+    { "text": "1200 Commerce Pkwy, Mount Laurel", "contacts": ["tom@alvarezholdings.example", "shots@sjphoto.example"] },
+    { "text": "Haddon Square Shopping Center", "contacts": ["tom@alvarezholdings.example", "shots@sjphoto.example"] },
+    { "text": "22 Elm St, Cherry Hill", "contacts": ["sarah.kim@jll.example", "mike.ruiz@cbre.example"] },
+    { "text": "510 Main St", "contacts": ["gmoss@mosslaw.example", "vwisher@hillwallack.example"] },
+    { "text": "77 Route 73, Marlton", "contacts": ["npatel@firstbank.example"] }
+  ]
+}

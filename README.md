@@ -32,6 +32,7 @@ Development only (ignored in production):
 | `DEV_EXTRACTION_FILE` | A saved extraction (JSON) used instead of calling Claude, to try the screens without a Claude key. |
 | `DEV_MAILBOX_FILE` | A file of emails that stands in for Outlook in the Email tab, e.g. `src/lib/email/fixtures/sample-mailbox.json` (made up). |
 | `DEV_CLASSIFICATION_FILE` | Saved answers used instead of calling Claude to sort email, e.g. `src/lib/email/fixtures/sample-classification.json`. |
+| `DEV_SCAN_FILE` | Saved answers used instead of calling Claude in the first-time scan (Email tab, Contacts), e.g. `src/lib/email/fixtures/sample-scan.json`. |
 
 Phones sign in from a computer: Monday's sign-in page doesn't work in a phone browser, so the phone shows a code and the broker enters it at `/link` on a computer (see `src/lib/link.ts`).
 

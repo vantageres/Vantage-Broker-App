@@ -4,7 +4,9 @@ import { BOARDS, peopleMatching, propertyLeadsFor, type Context } from "../captu
 import { teamFor } from "../monday/team";
 import { claudeClassifier, savedClassifier, type Classifier } from "./classify";
 import { accessToken, getConnection } from "./connection";
-import { knownPeople } from "./people";
+import { knownPeople, type Known } from "./people";
+import { directoryFor } from "./directory-store";
+import { directoryBins, directoryDeals } from "./scan";
 import { applyRun, applyTap, changeLine, emptyItems, type ItemsState, type TapAction, type TapResult } from "./open-items";
 import { runCheck, type MonitorState, type Run } from "./run";
 import { sealer } from "./server";
@@ -50,7 +52,7 @@ export function classifierFor(env = process.env): Classifier {
   return claudeClassifier(new Anthropic({ apiKey, authToken: null }));
 }
 
-async function lookupInMonday(ctx: Context, people: Person[]) {
+export async function lookupInMonday(ctx: Context, people: Person[]) {
   const external = people.filter((p) => !/@(vantageres|vantagepm)\.com$/i.test(p.address)).map((p) => p.address);
   try {
     const [records, team] = await Promise.all([
@@ -115,12 +117,24 @@ export function tapItem(userId: string, num: number, action: TapAction, version:
 export async function checkNow(ctx: Context): Promise<Run> {
   const source = await mailSourceFor(ctx.me.id);
   const state = (await readSealed<MonitorState>(stateKey(ctx.me.id))) ?? { seen: {} };
+  // The broker's directory (first-time scan): kept contacts' types fill in
+  // for people Monday doesn't know, and kept properties group mail as deals.
+  const directory = await directoryFor(ctx.me.id);
+  const bins = directoryBins(directory);
   const { run, state: next, forItems } = await runCheck({
     source,
     classify: classifierFor(),
     brokerName: ctx.me.name,
-    deals: async () => (await propertyLeadsFor(ctx)).map((l) => ({ id: l.id, name: l.name })),
-    lookup: (people) => lookupInMonday(ctx, people),
+    deals: async () => [...(await propertyLeadsFor(ctx)).map((l) => ({ id: l.id, name: l.name })), ...directoryDeals(directory)],
+    lookup: async (people) => {
+      const known = await lookupInMonday(ctx, people);
+      if (!known) return null;
+      for (const p of people) {
+        const bin = bins.get(p.address);
+        if (bin && !known.has(p.address)) known.set(p.address, { bin } satisfies Known);
+      }
+      return known;
+    },
   }, state);
   const outcome = await withItems(ctx.me.id, async (items) => {
     const o = applyRun(items, forItems);

@@ -35,6 +35,9 @@ export interface MailSource {
   messagesSince(since: Date): Promise<MailMessage[]>;
   // The new text of each message, by id. Messages it can't read are left out.
   bodies(ids: string[]): Promise<Record<string, string>>;
+  // For the first-time scan: like messagesSince, reaching further back. Up to
+  // 1,000 messages per folder in Outlook. The file adds its older "history".
+  scanSince?(since: Date): Promise<MailMessage[]>;
 }
 
 // ---- File (development) ----
@@ -50,21 +53,22 @@ interface FileMessage extends Omit<MailMessage, "at" | "from" | "to" | "cc"> {
 interface MailboxFile {
   owner: Person;
   messages: FileMessage[];
+  history?: FileMessage[]; // older made-up mail, for the first-time scan only
 }
 
 const person = (p: Person | string): Person =>
   typeof p === "string" ? { name: p, address: p.toLowerCase() } : { name: p.name, address: p.address.toLowerCase() };
 
-export function parseMailbox(text: string, now = Date.now()): { owner: Person; messages: MailMessage[] } {
+export function parseMailbox(text: string, now = Date.now()): { owner: Person; messages: MailMessage[]; history: MailMessage[] } {
   const file = JSON.parse(text) as MailboxFile;
-  const messages = file.messages.map((m): MailMessage => ({
+  const read = (list: FileMessage[]) => list.map((m): MailMessage => ({
     ...m,
     from: person(m.from),
     to: (m.to ?? []).map(person),
     cc: (m.cc ?? []).map(person),
     at: m.at ?? new Date(now - (m.minutesAgo ?? 0) * 60_000).toISOString(),
-  }));
-  return { owner: person(file.owner), messages: messages.sort((a, b) => a.at.localeCompare(b.at)) };
+  })).sort((a, b) => a.at.localeCompare(b.at));
+  return { owner: person(file.owner), messages: read(file.messages), history: read(file.history ?? []) };
 }
 
 export function devMailboxFile(env = process.env): string | null {
@@ -85,6 +89,11 @@ export function fileSource(path: string, now: () => number = Date.now): MailSour
       const box = await load();
       owner = box.owner;
       return box.messages.filter((m) => m.at >= since.toISOString()).map(({ body: _body, ...rest }) => rest);
+    },
+    async scanSince(since) {
+      const box = await load();
+      owner = box.owner;
+      return [...box.history, ...box.messages].filter((m) => m.at >= since.toISOString()).map(({ body: _body, ...rest }) => rest);
     },
     async bodies(ids) {
       const box = await load();

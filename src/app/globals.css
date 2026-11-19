@@ -284,7 +284,7 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .email-contacts li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 
 /* Open items (email monitor step 4) */
-.oi-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.oi-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
 .oi-switch button { min-height: 38px; border: 0; border-radius: 10px; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .oi-switch button[aria-selected="true"] { background: var(--navy); color: #fff; }
 .oi-filters { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
@@ -323,3 +323,19 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .add-monday-card { margin: 6px -12px 0; }
 .add-monday-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .add-monday-field input { height: 40px; border: 1px solid var(--control); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 15px; color: var(--ink); }
+
+/* First-time scan and directory (email monitor step 6) */
+.scan-progress { padding: 16px; gap: 8px; }
+.scan-bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.scan-bar span { display: block; height: 100%; background: var(--navy); transition: width 0.4s; }
+.scan-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 520px) { .scan-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.scan-row { padding: 12px 14px; gap: 10px; }
+.scan-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.scan-controls { display: flex; flex-direction: column; gap: 8px; }
+.scan-bin { display: flex; align-items: center; gap: 8px; }
+.scan-bin select { height: 40px; border: 1px solid var(--control); border-radius: 10px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; max-width: 220px; }
+.scan-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.scan-actions .secondary { height: 40px; padding: 0 14px; border-radius: 12px; }
+.scan-pages { display: flex; justify-content: space-between; align-items: center; }
+.email-run > .secondary { align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 12px; }

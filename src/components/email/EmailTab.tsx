@@ -5,6 +5,7 @@ import type { EmailStatus } from "@/lib/email/status";
 import { isOutcome, OUTCOME_TEXT } from "@/lib/email/problems";
 import type { Run } from "@/lib/email/run";
 import { OpenItems } from "./OpenItems";
+import { ContactsReview } from "./ContactsReview";
 import { RunSummary } from "./RunSummary";
 import { emailFetch } from "./api";
 import { timeInNewJersey } from "@/lib/time";
@@ -18,7 +19,7 @@ export function EmailTab({ outcome }: { outcome?: string }) {
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [checking, setChecking] = useState(false);
-  const [view, setView] = useState<"items" | "check">("items");
+  const [view, setView] = useState<"items" | "check" | "contacts">("items");
   const [checks, setChecks] = useState(0);
   const message = isOutcome(outcome) && outcome !== "connected" ? OUTCOME_TEXT[outcome] : null;
 
@@ -129,8 +130,9 @@ export function EmailTab({ outcome }: { outcome?: string }) {
           <div className="oi-switch" role="tablist" aria-label="Email">
             <button type="button" role="tab" aria-selected={view === "items"} onClick={() => setView("items")}>Open items</button>
             <button type="button" role="tab" aria-selected={view === "check"} onClick={() => setView("check")}>New email</button>
+            <button type="button" role="tab" aria-selected={view === "contacts"} onClick={() => setView("contacts")}>Contacts</button>
           </div>
-          {view === "items" ? (
+          {view === "contacts" ? <ContactsReview /> : view === "items" ? (
             <OpenItems refreshKey={checks} lastLine={run?.openItems ? `Last check ${timeInNewJersey(run.at)}. ${run.openItems.line}.` : null} />
           ) : run ? <RunSummary run={run} /> : !checking && <p className="empty">Tap Check now to sort your new email.</p>}
         </>

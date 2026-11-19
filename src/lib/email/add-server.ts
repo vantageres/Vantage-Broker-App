@@ -4,6 +4,7 @@ import { matchTerms } from "../matching";
 import { teamFor } from "../monday/team";
 import { fromContact, fromLead, NotAddable, personFor, resultFor, withTyped, type AddRef, type AddResult } from "./add-to-monday";
 import { latestRun } from "./monitor-server";
+import { directoryFor } from "./directory-store";
 
 // Add to Monday on the server. The email's details come from the broker's
 // latest run in the store, never from the page, and Monday is searched for
@@ -11,16 +12,18 @@ import { latestRun } from "./monitor-server";
 // Approve uses the app's existing save.
 export async function proposeFromEmail(ctx: Context, ref: AddRef, asNew = false, typed: { email?: string; phone?: string } = {}): Promise<AddResult> {
   const run = await latestRun(ctx.me.id);
-  if (!run) throw new NotAddable("Tap Check now first.");
   let from;
   if ("conversationId" in ref) {
-    const item = run.items.find((i) => i.conversationId === ref.conversationId);
+    const item = run?.items.find((i) => i.conversationId === ref.conversationId);
     if (!item) throw new NotAddable("That email is no longer in the latest check. Tap Check now and try again.");
     from = fromLead(item);
   } else {
-    const contact = run.newContacts.find((c) => c.email === ref.email.toLowerCase());
-    if (!contact) throw new NotAddable("That contact is no longer in the latest check. Tap Check now and try again.");
-    from = fromContact(contact);
+    // A new contact from the latest check, or one from the broker's directory (first-time scan).
+    const email = ref.email.toLowerCase();
+    const fromRun = run?.newContacts.find((c) => c.email === email);
+    const fromDirectory = fromRun ? null : (await directoryFor(ctx.me.id)).contacts.find((c) => c.email === email && c.status !== "removed");
+    if (!fromRun && !fromDirectory) throw new NotAddable("That contact is no longer in your list. Tap Check now and try again.");
+    from = fromContact(fromRun ?? { name: fromDirectory!.name, email, company: fromDirectory!.company, proposedBin: fromDirectory!.bin, confidence: fromDirectory!.confidence });
   }
   from = withTyped(from, typed);
   // A new Lead from email needs an email or a phone (spec 03, L7).
