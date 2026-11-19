@@ -310,3 +310,5 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .oi-actions .approve, .oi-actions .secondary { height: 44px; padding: 0 16px; border-radius: 12px; font-size: 15px; }
 .oi-actions .approve { flex: 1 1 100%; }
 @media (min-width: 900px) { .oi-actions .approve { flex: 0 0 auto; } }
+/* Email links take only the width of their text, not the whole card. */
+.oi-email, .email-open, .email-body > a.open-link { align-self: flex-start; }
