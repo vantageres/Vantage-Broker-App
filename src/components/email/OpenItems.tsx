@@ -97,9 +97,9 @@ export function OpenItems({ refreshKey, lastLine }: { refreshKey: number; lastLi
       {droppingToday.map(({ item }) => (
         <div key={item.num} className="oi-drop" role="alert">
           <div>
-            <strong>#{item.num} drops today.</strong> {item.title}. Tap Keep or it leaves the list next business day.
+            <strong>#{item.num} drops today.</strong> {item.title}. Tap Keep on list or it leaves the list next business day.
           </div>
-          <button className="approve" type="button" disabled={saving === item.num} onClick={() => tap(item, "keep")}>Keep 10 more days</button>
+          <button className="approve" type="button" disabled={saving === item.num} onClick={() => tap(item, "keep")}>Keep on list</button>
         </div>
       ))}
 
@@ -155,13 +155,15 @@ export function OpenItems({ refreshKey, lastLine }: { refreshKey: number; lastLi
                         <>
                           <button className="approve" type="button" disabled={busy} onClick={() => tap(item, "done")}>{busy ? "Saving…" : "Done"}</button>
                           <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, "finished")}>{firstName ? `${firstName} finished it` : "Colleague handled"}</button>
-                          <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, "keep")}>{view.group === "dropping" ? "Keep 10 more days" : "Keep"}</button>
                           {item.importance === "normal" && !item.escalated && (
                             <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, "high")}>Make High</button>
                           )}
                           <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, item.snoozeUntil ? "unsnooze" : "snooze")}>
                             {item.snoozeUntil ? "Unsnooze" : "Snooze 1 day"}
                           </button>
+                          {view.nearDrop && (
+                            <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, "keep")}>Keep on list</button>
+                          )}
                         </>
                       ) : (
                         <button className="secondary" type="button" disabled={busy} onClick={() => tap(item, "reopen")}>{busy ? "Saving…" : "Reopen"}</button>

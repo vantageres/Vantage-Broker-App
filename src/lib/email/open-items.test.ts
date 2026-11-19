@@ -229,6 +229,14 @@ describe("open items: age", () => {
     expect(viewOf(only(out.state), "2026-11-26")).toMatchObject({ group: "dropping", tag: "Drops in 2 days" });
   });
 
+  it("Keep on list is offered only from age 8, or with a drop notice", () => {
+    const { state } = highItem();
+    expect(viewOf(only(state), "2026-11-25").nearDrop).toBe(false); // age 7
+    expect(viewOf(only(state), "2026-11-26").nearDrop).toBe(true); // age 8
+    const closed = { ...only(state), state: "closed" as const, closedOn: "2026-11-26" };
+    expect(viewOf(closed, "2026-11-26").nearDrop).toBe(false);
+  });
+
   it("OI9 and OI10: at age 10 it gets a notice; the next business day it drops", () => {
     const notice = run(highItem().state, when(30), []);
     expect(only(notice.state)).toMatchObject({ state: "open", dropNoticeOn: "2026-11-30" });

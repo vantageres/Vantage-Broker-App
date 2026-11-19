@@ -117,6 +117,7 @@ export interface ItemView {
   tag: string | null;
   daysLeft: number;
   droppingToday: boolean;
+  nearDrop: boolean; // age 8 or more, or a drop notice: "Keep on list" is offered
 }
 
 export const GROUP_ORDER: ItemGroup[] = ["high", "normal", "pastdue", "dropping", "colleague", "snoozed", "closed"];
@@ -141,7 +142,7 @@ export function viewOf(item: OpenItem, today: string): ItemView {
     : item.escalated ? "Upgraded to High"
     : item.due ? `Due ${shortDay(item.due)}`
     : null;
-  return { age, group, tag, daysLeft: notice ? 0 : Math.max(0, DROP_AGE - age), droppingToday: !!notice };
+  return { age, group, tag, daysLeft: notice ? 0 : Math.max(0, DROP_AGE - age), droppingToday: !!notice, nearDrop: item.state === "open" && (!!notice || age >= DROPPING_AGE) };
 }
 
 export function closedRecently(item: OpenItem, today: string) {
@@ -494,7 +495,7 @@ export function applyTap(before: ItemsState, num: number, action: TapAction, ver
       item.clockStart = today;
       item.keptCount++;
       item.dropNoticeOn = null;
-      note(item, today, "Kept 10 more days", "broker");
+      note(item, today, "Kept on list for 10 more business days", "broker");
       break;
     case "high":
       if (item.state !== "open" || item.importance === "high" || item.escalated) return refuse("That item is already High.");
