@@ -128,7 +128,7 @@ export function EmailTab({ outcome }: { outcome?: string }) {
           </button>
           <div className="oi-switch" role="tablist" aria-label="Email">
             <button type="button" role="tab" aria-selected={view === "items"} onClick={() => setView("items")}>Open items</button>
-            <button type="button" role="tab" aria-selected={view === "check"} onClick={() => setView("check")}>Latest check</button>
+            <button type="button" role="tab" aria-selected={view === "check"} onClick={() => setView("check")}>New email</button>
           </div>
           {view === "items" ? (
             <OpenItems refreshKey={checks} lastLine={run?.openItems ? `Last check ${timeInNewJersey(run.at)}. ${run.openItems.line}.` : null} />

@@ -93,7 +93,7 @@ export function RunSummary({ run }: { run: Run }) {
   const groups = sections(run.items);
   let lastGroup = "";
   return (
-    <section className="email-run" aria-label="Latest check">
+    <section className="email-run" aria-label="New email">
       <p className="inline-msg" style={{ margin: 0 }}>
         Checked {dayAndTime(run.at)}. Mail since {dayAndTime(run.windowStart)}.
       </p>
