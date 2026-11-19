@@ -5,6 +5,7 @@ import { BINS, type DirContact, type Directory, type DirProperty, type ScanBin }
 import { ADDABLE_BINS } from "@/lib/email/add-to-monday";
 import type { ScanStatus } from "@/lib/email/scan-server";
 import { AddToMonday } from "./AddToMonday";
+import { NewPropertyLeadFromEmail } from "./NewPropertyLeadFromEmail";
 import { emailFetch } from "./api";
 
 // The first-time scan and the broker's directory (plan step 6): who the
@@ -256,6 +257,7 @@ function PropertyRow({ p, dir, busy, tap }: { p: DirProperty; dir: Directory; bu
         {p.status !== "removed" && <button className="secondary" type="button" disabled={busy} onClick={() => tap({ action: "remove" })}>Remove</button>}
         {p.status !== "review" && <button className="secondary" type="button" disabled={busy} onClick={() => tap({ action: "review" })}>Back to review</button>}
       </div>
+      {p.status !== "removed" && <NewPropertyLeadFromEmail id={p.id} />}
     </article>
   );
 }

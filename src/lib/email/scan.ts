@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isLeadSource, noiseKind, type NoiseKind } from "./noise";
 import type { MailMessage, Person } from "./source";
+import type { PropertyLeadDraft } from "../property-leads/extract";
 import { isInternal } from "./threads";
 
 // The first-time scan and the broker's directory (plan decision 7, spec 04).
@@ -298,4 +299,26 @@ export function directoryBins(dir: Directory): Map<string, ScanBin> {
 
 export function directoryDeals(dir: Directory): { id: string; name: string }[] {
   return dir.properties.filter((p) => p.status === "kept").map((p) => ({ id: `dir:${p.id}`, name: p.name }));
+}
+
+// "New Property Lead" from a listed property (plan step 6, John Nov 19): the
+// address as the name, and as its contact the owner the mail was with, when
+// a related contact is typed Client. Nothing else is guessed; the broker
+// fills the rest on the card.
+export function propertyLeadDraft(p: DirProperty, dir: Directory): { draft: PropertyLeadDraft; note: string } {
+  const related = p.contacts.map((e) => dir.contacts.find((c) => c.email === e)).filter((c): c is DirContact => !!c && c.status !== "removed");
+  const owner = related.find((c) => c.bin === "Client");
+  const names = related.map((c) => c.name ?? c.email);
+  return {
+    draft: {
+      address: p.name,
+      listing_type: null,
+      property_type: null,
+      listing_price: null,
+      size: null,
+      contact: { name: owner?.name ?? null, business_name: owner?.company ?? null, phones: [], emails: owner ? [owner.email] : [] },
+      uncertain: [],
+    },
+    note: `From email: ${p.name}${names.length ? `, in mail with ${names.join(", ")}` : ""}.`,
+  };
 }

@@ -375,6 +375,12 @@ export async function newPropertyLead(ctx: Context, note: string): Promise<NewPr
   // Development only: a saved reading stands in for Claude (DEV_PROPERTY_LEAD_FILE).
   const devFile = process.env.NODE_ENV !== "production" ? process.env.DEV_PROPERTY_LEAD_FILE : undefined;
   const draft = devFile ? PropertyLeadDraft.parse(JSON.parse(readFileSync(devFile, "utf8"))) : await extractPropertyLead(claude(), note, today);
+  return propertyLeadProposal(ctx, draft, note);
+}
+
+// A Property Lead to approve, from what is known about it: read from a note
+// above, or built in code (a property found in the broker's email, plan step 6).
+export async function propertyLeadProposal(ctx: Context, draft: PropertyLeadDraft, note: string): Promise<NewPropertyLeadProposal> {
   const questions = draft.uncertain.map((u) => ({ field: u.field, question: u.question }));
 
   let location: NewPropertyLeadProposal["location"] = null;

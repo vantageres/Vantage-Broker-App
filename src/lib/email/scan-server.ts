@@ -2,11 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { BoardHidden } from "../monday/client";
 import { loadProperties } from "../monday/properties";
 import { getStore } from "../store";
-import { PROPERTY_BOARDS, propertyLeadsFor, todayInNewJersey, type Context } from "../capture/service";
+import { PROPERTY_BOARDS, propertyLeadsFor, propertyLeadProposal, todayInNewJersey, type Context } from "../capture/service";
+import type { NewPropertyLeadProposal } from "../property-leads/create";
 import { lookupInMonday, mailSourceFor } from "./monitor-server";
 import {
   applyDirTap, checkBins, countMail, findProperty, mergeScan, PER_CALL, SCAN_DAYS, sameProperty,
-  shortlist, type Binner, type Counted, type Directory, type DirTap, type KnownProperty, type Proposed,
+  propertyLeadDraft, shortlist, type Binner, type Counted, type Directory, type DirTap, type KnownProperty, type Proposed,
 } from "./scan";
 import { sealer } from "./server";
 import { claudeBinner, savedBinner } from "./binner";
@@ -175,4 +176,21 @@ export async function tapDirectory(userId: string, tap: DirTap): Promise<Directo
 export async function deleteDirectory(userId: string) {
   await deleteDirectoryOnly(userId);
   await getStore().del(scanKey(userId));
+}
+
+export type PropertyLeadResult =
+  | { kind: "card"; proposal: NewPropertyLeadProposal }
+  | { kind: "in-monday"; name: string; url: string; boardLabel: string };
+
+// The New Property Lead card for a property from the scan. Monday is checked
+// again first: it may have been added since. Nothing is saved here; the
+// card's own Approve creates it, as for a typed note.
+export async function proposePropertyLead(ctx: Context, id: string): Promise<PropertyLeadResult> {
+  const dir = await directoryFor(ctx.me.id);
+  const p = dir.properties.find((x) => x.id === id && x.status !== "removed");
+  if (!p) throw new Error("That property is no longer in your list.");
+  const found = findProperty(p.name, await knownProperties(ctx));
+  if (found) return { kind: "in-monday", name: found.name, url: found.url, boardLabel: found.boardLabel };
+  const { draft, note } = propertyLeadDraft(p, dir);
+  return { kind: "card", proposal: await propertyLeadProposal(ctx, draft, note) };
 }

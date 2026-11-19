@@ -167,3 +167,21 @@ describe("the directory", () => {
     expect(again.properties.map((p) => [p.id, p.name, p.contacts.length])).toEqual([["p1", "Haddon Square Shopping Center", 2], ["p2", "77 Route 73", 0]]);
   });
 });
+
+describe("New Property Lead from a listed property", () => {
+  it("names it by the address and takes the owner (a Client in the mail) as its contact", async () => {
+    const { propertyLeadDraft } = await import("./scan");
+    let dir = mergeScan(emptyDirectory(), {
+      contacts: [
+        { email: "tom@x.example", name: "Tom Alvarez", company: "Alvarez Holdings", bin: "Client", related_deal: null, why: "", confidence: "high", received: 3, sentTo: 3, last: "" },
+        { email: "shots@p.example", name: null, company: "Photo", bin: "Vendor", related_deal: null, why: "", confidence: "high", received: 1, sentTo: 2, last: "" },
+      ],
+      properties: [{ text: "Haddon Square Shopping Center", contacts: ["shots@p.example", "tom@x.example"] }],
+    }, { inbox: 1, sent: 1, capped: false, noise: 0, inMonday: 0, asked: 2 }, "2026-11-19T17:00:00Z");
+    const { draft, note } = propertyLeadDraft(dir.properties[0], dir);
+    expect(draft).toMatchObject({ address: "Haddon Square Shopping Center", listing_type: null, contact: { name: "Tom Alvarez", business_name: "Alvarez Holdings", emails: ["tom@x.example"] } });
+    expect(note).toBe("From email: Haddon Square Shopping Center, in mail with shots@p.example, Tom Alvarez.");
+    dir = applyDirTap(dir, { kind: "contact", email: "tom@x.example", action: "remove" }, "2026-11-19");
+    expect(propertyLeadDraft(dir.properties[0], dir).draft.contact).toEqual({ name: null, business_name: null, phones: [], emails: [] });
+  });
+});

@@ -62,7 +62,7 @@ The app reads only the signed-in broker's mailbox. What it can see decides what 
 6. The broker reviews in batches: keep, change the type, or remove. Kept contacts and properties form the broker's directory, used by every later run.
 7. From the review, a contact can go to "Add to Monday" (decision 8).
 
-**Open question for John:** what happens to a property that is not in Monday? Recommended: listed for the broker, used to group mail by deal, with "New Property Lead" (the existing flow) as an option. Nothing is created without approval.
+**Decided (John, Nov 19):** a property that is not in Monday is listed for the broker, used to group mail by deal once kept, and offers "New Property Lead". Built: the button checks Monday again (it may have been added since), then opens the existing Property Lead card with the address as its name and, as its contact, the owner the mail was with (a related contact typed Client). The rest is filled on the card; Approve creates it through the existing `/api/property-lead/create`. The card is built in code (`propertyLeadProposal` in `capture/service.ts`, split out of the note flow), so no Claude call.
 
 ## Prerequisites outside the code (John or Leor)
 
@@ -99,7 +99,7 @@ Each step is tried locally and reviewed by John before the next.
    - Review: To review, Kept and Removed; grouped by type, 20 per page; change the type, Keep, Remove, Back to review, "Keep all shown", and Add to Monday on Client, Prospect and Outside Broker (step 5's card). Scan again keeps what the broker already decided and only refreshes counts. The model never changes the directory; only taps do.
    - Used by every check: kept contacts' types fill in for people Monday doesn't know (so Claude sees "Client" or "Attorney"), and they stop being proposed as new contacts; kept properties are added to the deals Claude groups mail by (`dir:p1`...).
    - Code: `scan.ts` (rules), `binner.ts` (Claude or `DEV_SCAN_FILE`), `prompts/propose-bins.ts`, `scan-server.ts`, `directory-store.ts`, `/api/email/scan`, `/api/email/directory`, `ContactsReview.tsx`; tests in `scan.test.ts`. Made-up history (38 older messages) is in the development mailbox under `history`, read only by the scan; saved answers in `fixtures/sample-scan.json`.
-   - Not done from spec 04: the questions after review (who is missing, brokers vs staff, Always High, Always Noise), proposing active deals with stages and dates, seeding Open Items from the last 5 business days, and importing a pilot broker's Claude directory. "New Property Lead" from a listed property waits on John's answer to the open question below.
+   - Not done from spec 04: the questions after review (who is missing, brokers vs staff, Always High, Always Noise), proposing active deals with stages and dates, seeding Open Items from the last 5 business days, and importing a pilot broker's Claude directory.
 7. **Scheduled runs.** Vercel cron every 15 minutes, slot worked out in America/New_York; 7am full list, later runs show changes; history lines (up to 15 per run).
 8. **Later:** Add task, matching colleague replies across connected mailboxes, importing from the Claude version, Settings for rules (Always High, Always Noise), other brokers.
 
