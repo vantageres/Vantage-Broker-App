@@ -30,6 +30,8 @@ Development only (ignored in production):
 | `MONDAY_DEV_TOKEN` | A personal Monday token, for development on a PC. "Development sign-in" and the scripts use it. While it is in use, writes outside the Broker App Test workspace are refused. |
 | `MONDAY_DEV_PROXY_AUTH=1` | Shows "Development sign-in", which signs in as the owner of the environment's Monday token (added by the cloud environment's network secret). |
 | `DEV_EXTRACTION_FILE` | A saved extraction (JSON) used instead of calling Claude, to try the screens without a Claude key. |
+| `DEV_MAILBOX_FILE` | A file of emails that stands in for Outlook in the Email tab, e.g. `src/lib/email/fixtures/sample-mailbox.json` (made up). |
+| `DEV_CLASSIFICATION_FILE` | Saved answers used instead of calling Claude to sort email, e.g. `src/lib/email/fixtures/sample-classification.json`. |
 
 Phones sign in from a computer: Monday's sign-in page doesn't work in a phone browser, so the phone shows a code and the broker enters it at `/link` on a computer (see `src/lib/link.ts`).
 

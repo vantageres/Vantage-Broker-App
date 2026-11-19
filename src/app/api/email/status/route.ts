@@ -6,12 +6,24 @@ import { accessToken, getConnection, ReconnectNeeded } from "@/lib/email/connect
 import { microsoftConfigured } from "@/lib/email/microsoft";
 import { countInboxSince, GraphError } from "@/lib/email/graph";
 import type { EmailStatus } from "@/lib/email/status";
+import { devMailboxFile, fileSource } from "@/lib/email/source";
 
 // The connection check: who is connected, and how many emails reached the
 // inbox in the last 24 hours (ids only; nothing else is read or kept).
 export async function GET() {
   return withBroker(async (ctx) => {
     if (!emailMonitorAllowed(ctx.me.id)) return NextResponse.json({ error: "Not available." }, { status: 403 });
+    // Development: a file of made-up (or snapshot) mail stands in for Outlook.
+    const file = devMailboxFile();
+    if (file) {
+      const box = await fileSource(file).load();
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const count = box.messages.filter((m) => m.folder === "inbox" && m.at >= since).length;
+      return NextResponse.json({
+        state: "connected", dev: true, name: box.owner.name, address: box.owner.address, connectedAt: new Date().toISOString(),
+        last24h: { count, capped: false },
+      } satisfies EmailStatus);
+    }
     if (!microsoftConfigured()) return NextResponse.json({ state: "not-set-up" } satisfies EmailStatus);
     const deps = connectionDeps();
     const conn = await getConnection(deps, ctx.me.id);

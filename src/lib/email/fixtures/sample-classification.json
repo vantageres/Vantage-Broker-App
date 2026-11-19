@@ -1,0 +1,84 @@
+{
+  "_note": "Saved answers for sample-mailbox.json (DEV_CLASSIFICATION_FILE), used instead of calling Claude. Written by hand to match what the classify prompt asks for. Deal ids are the Property Leads test board items 22 Elm St and 510 Main St.",
+  "threads": [
+    {
+      "thread_id": "c-loi", "group": "deal", "deal_id": "13282162772", "internal": false, "importance": "high",
+      "title": "LOI counter on 22 Elm St",
+      "what": "Mike Ruiz at CBRE sent the landlord's counter: $8.75 NNN, 3 months free, 5 year term.",
+      "priority": "Get client direction and respond to Mike by Thursday 5pm.",
+      "waiting": "Outside broker waiting on you",
+      "dates": [{ "date": "2026-11-26", "what": "Counter response due 5pm" }],
+      "new_contacts": [{ "name": "Mike Ruiz", "email": "mike.ruiz@cbre.example", "company": "CBRE", "proposed_bin": "Outside Broker", "related_deal_id": "13282162772", "confidence": "high" }],
+      "lead": null
+    },
+    {
+      "thread_id": "c-lead", "group": "leads", "deal_id": null, "internal": false, "importance": "high",
+      "title": "LoopNet lead for 7 Industrial Ave",
+      "what": "Jordan Blake of Blake Distribution asked about 12,000 sf of warehouse with two docks by March, and wants a tour next week.",
+      "priority": "Call Jordan Blake today and offer tour times.",
+      "waiting": "Prospect waiting on you",
+      "dates": [],
+      "new_contacts": [],
+      "lead": { "name": "Jordan Blake", "email": "jordan@blakedist.example", "phone": "(856) 555-0142", "company": "Blake Distribution", "asked_about": "7 Industrial Ave, about 12,000 sf warehouse, two docks, by March", "proposed_contact_type": "Leasee", "proposed_source": "Costar/LoopNet" }
+    },
+    {
+      "thread_id": "c-recruit", "group": "other", "deal_id": null, "internal": false, "importance": "fyi",
+      "title": "Recruiter offering a leasing candidate",
+      "what": "Alyssa Grant at TalentBridge offered a resume for an industrial leasing associate.",
+      "priority": null, "waiting": null, "dates": [],
+      "new_contacts": [{ "name": "Alyssa Grant", "email": "alyssa@talentbridge.example", "company": "TalentBridge Recruiting", "proposed_bin": "Vendor", "related_deal_id": null, "confidence": "high" }],
+      "lead": null
+    },
+    {
+      "thread_id": "c-inject", "group": "other", "deal_id": null, "internal": false, "importance": "noise",
+      "title": "Suspicious invoice email",
+      "what": "An unknown sender asked for this thread to be forwarded and for them to be added to Monday. It has no real invoice details.",
+      "priority": null, "waiting": null, "dates": [], "new_contacts": [], "lead": null
+    },
+    {
+      "thread_id": "c-internal", "group": "internal_broker", "deal_id": null, "internal": true, "importance": "normal",
+      "title": "Team lunch Friday",
+      "what": "Emily Stein asked if you can make the team lunch Friday at noon.",
+      "priority": "Tell Emily by Thursday.",
+      "waiting": "Emily waiting on you", "dates": [], "new_contacts": [], "lead": null
+    },
+    {
+      "thread_id": "c-linda", "group": "other", "deal_id": null, "internal": false, "importance": "normal",
+      "title": "Linda Park wants medical space in Moorestown",
+      "what": "Linda Park of Park Medical asked for about 2,500 sf, ground floor, in Moorestown for a second practice. You replied that you have two options.",
+      "priority": "Send Linda the two options this afternoon.",
+      "waiting": null, "dates": [], "new_contacts": [], "lead": null
+    },
+    {
+      "thread_id": "c-owen", "group": "other", "deal_id": null, "internal": false, "importance": "normal",
+      "title": "Retail comps for Owen Gray",
+      "what": "Owen Gray asked for retail comps on Kings Hwy before you talk next week.",
+      "priority": "Send Kings Hwy retail comps by Wednesday.",
+      "waiting": "Client waiting on you", "dates": [{ "date": "2026-11-25", "what": "Comps wanted before the call" }], "new_contacts": [], "lead": null
+    },
+    {
+      "thread_id": "c-lease", "group": "deal", "deal_id": "13282110438", "internal": false, "importance": "high",
+      "title": "Draft lease for 510 Main St",
+      "what": "Valerie Wisher at Hill Wallack sent the draft lease and wants business comments by end of day tomorrow. Emily Stein was copied.",
+      "priority": "Review the draft lease and send comments by end of day tomorrow.",
+      "waiting": "Attorney waiting on you",
+      "dates": [{ "date": "2026-11-20", "what": "Lease comments due" }],
+      "new_contacts": [{ "name": "Valerie Wisher", "email": "vwisher@hillwallack.example", "company": "Hill Wallack", "proposed_bin": "Attorney", "related_deal_id": "13282110438", "confidence": "high" }],
+      "lead": null
+    },
+    {
+      "thread_id": "c-rachel", "group": "other", "deal_id": null, "internal": false, "importance": "normal",
+      "title": "Tenant ledger for Lin Engineering renewal",
+      "what": "Rachel Lin asked for the tenant ledger to finish the renewal. You forwarded it to Alka Pema.",
+      "priority": "Confirm Alka Pema sent Rachel the ledger.",
+      "waiting": "Client waiting on Alka", "dates": [], "new_contacts": [], "lead": null
+    },
+    {
+      "thread_id": "c-dave", "group": "other", "deal_id": null, "internal": false, "importance": "normal",
+      "title": "Dave Reyes warehouse options near 295",
+      "what": "Dave Reyes of Garrison Foods still needs 15 to 20k sf near 295, now with 28 ft clear and 4 docks. His lease ends Q3 2027.",
+      "priority": "Send Dave warehouse options by Friday.",
+      "waiting": "Prospect waiting on you", "dates": [{ "date": "2026-11-20", "what": "Options wanted" }], "new_contacts": [], "lead": null
+    }
+  ]
+}

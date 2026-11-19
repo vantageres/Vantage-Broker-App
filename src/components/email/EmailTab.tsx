@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import type { EmailStatus } from "@/lib/email/status";
 import { isOutcome, OUTCOME_TEXT } from "@/lib/email/problems";
+import type { Run } from "@/lib/email/run";
+import { RunSummary } from "./RunSummary";
 
-// The Email tab. Step 2 of docs/email-monitor-plan.md: connect Outlook and
-// prove the app can read the inbox. Nothing from the mailbox is shown or kept
-// beyond a count.
+// The Email tab (docs/email-monitor-plan.md): connect Outlook, then Check now
+// sorts new mail and shows the latest run. In development a file of made-up
+// mail stands in for Outlook.
 export function EmailTab({ outcome }: { outcome?: string }) {
   const [status, setStatus] = useState<EmailStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<Run | null>(null);
+  const [checking, setChecking] = useState(false);
   const message = isOutcome(outcome) && outcome !== "connected" ? OUTCOME_TEXT[outcome] : null;
 
   const load = useCallback(async () => {
@@ -28,6 +32,33 @@ export function EmailTab({ outcome }: { outcome?: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const connected = status?.state === "connected";
+  useEffect(() => {
+    if (!connected) return;
+    fetch("/api/email/check", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((b: { run?: Run | null }) => setRun(b.run ?? null))
+      .catch(() => {});
+  }, [connected]);
+
+  async function checkNow(reset = false) {
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/email/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset }) });
+      const body = await res.json();
+      if (!res.ok) {
+        if (body.reconnect) await load();
+        throw new Error(body.error ?? "The check didn't finish. Try again in a minute.");
+      }
+      setRun(body.run as Run);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The check didn't finish. Try again in a minute.");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function disconnectOutlook() {
     setBusy(true);
@@ -73,30 +104,24 @@ export function EmailTab({ outcome }: { outcome?: string }) {
       )}
 
       {status?.state === "connected" && (
-        <section className="card">
-          <div className="card-head">
-            <span className="title">Outlook connected</span>
-            <span className="chip">READ ONLY</span>
-          </div>
-          <div className="rows">
-            <div className="lookup-row"><span className="row-label">Mailbox</span><span>{status.address}</span></div>
-            <div className="lookup-row">
-              <span className="row-label">Last 24 hours</span>
-              <span>
-                {status.last24h
-                  ? `${status.last24h.capped ? "1,000 or more" : status.last24h.count.toLocaleString("en-US")} ${status.last24h.count === 1 ? "email" : "emails"} in your inbox`
-                  : "Not checked"}
-              </span>
-            </div>
-          </div>
-          {status.problem && <p className="callout" style={{ background: "var(--bad-bg)", color: "var(--bad)" }}>{status.problem}</p>}
-          <div className="card-foot">
-            <button className="secondary" type="button" onClick={load} disabled={busy}>Check again</button>
-            <button className="link-btn" type="button" onClick={disconnectOutlook} disabled={busy} style={{ alignSelf: "center" }}>
-              Disconnect Outlook
-            </button>
-          </div>
-        </section>
+        <>
+          <section className="email-connection">
+            <span className="inline-msg" style={{ margin: 0 }}>
+              {status.dev ? "Development mailbox (made-up emails)" : `Outlook: ${status.address}`}
+              {status.last24h && ` · ${status.last24h.capped ? "1,000 or more" : status.last24h.count.toLocaleString("en-US")} in the inbox in 24 hours`}
+            </span>
+            {status.dev ? (
+              <button className="link-btn" type="button" onClick={() => checkNow(true)} disabled={checking} style={{ marginTop: 0 }}>Start over</button>
+            ) : (
+              <button className="link-btn" type="button" onClick={disconnectOutlook} disabled={busy} style={{ marginTop: 0 }}>Disconnect</button>
+            )}
+          </section>
+          {status.problem && <p className="alert" role="alert">{status.problem}</p>}
+          <button className="approve" type="button" onClick={() => checkNow()} disabled={checking}>
+            {checking ? "Checking your email…" : "Check now"}
+          </button>
+          {run ? <RunSummary run={run} /> : !checking && <p className="empty">Tap Check now to sort your new email.</p>}
+        </>
       )}
     </main>
   );
