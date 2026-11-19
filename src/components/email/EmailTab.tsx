@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { EmailStatus } from "@/lib/email/status";
 import { isOutcome, OUTCOME_TEXT } from "@/lib/email/problems";
 import type { Run } from "@/lib/email/run";
+import { OpenItems } from "./OpenItems";
 import { RunSummary } from "./RunSummary";
+import { emailFetch } from "./api";
+import { timeInNewJersey } from "@/lib/time";
 
 // The Email tab (docs/email-monitor-plan.md): connect Outlook, then Check now
 // sorts new mail and shows the latest run. In development a file of made-up
@@ -15,12 +18,14 @@ export function EmailTab({ outcome }: { outcome?: string }) {
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [checking, setChecking] = useState(false);
+  const [view, setView] = useState<"items" | "check">("items");
+  const [checks, setChecks] = useState(0);
   const message = isOutcome(outcome) && outcome !== "connected" ? OUTCOME_TEXT[outcome] : null;
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/email/status", { cache: "no-store" });
+      const res = await emailFetch("/api/email/status", { cache: "no-store" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Something went wrong.");
       setStatus(body as EmailStatus);
@@ -36,7 +41,7 @@ export function EmailTab({ outcome }: { outcome?: string }) {
   const connected = status?.state === "connected";
   useEffect(() => {
     if (!connected) return;
-    fetch("/api/email/check", { cache: "no-store" })
+    emailFetch("/api/email/check", { cache: "no-store" })
       .then((r) => r.json())
       .then((b: { run?: Run | null }) => setRun(b.run ?? null))
       .catch(() => {});
@@ -46,13 +51,14 @@ export function EmailTab({ outcome }: { outcome?: string }) {
     setChecking(true);
     setError(null);
     try {
-      const res = await fetch("/api/email/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset }) });
+      const res = await emailFetch("/api/email/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset }) });
       const body = await res.json();
       if (!res.ok) {
         if (body.reconnect) await load();
         throw new Error(body.error ?? "The check didn't finish. Try again in a minute.");
       }
       setRun(body.run as Run);
+      setChecks((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The check didn't finish. Try again in a minute.");
     } finally {
@@ -63,7 +69,7 @@ export function EmailTab({ outcome }: { outcome?: string }) {
   async function disconnectOutlook() {
     setBusy(true);
     try {
-      const res = await fetch("/api/email/disconnect", { method: "POST" });
+      const res = await emailFetch("/api/email/disconnect", { method: "POST" });
       if (!res.ok) throw new Error((await res.json()).error ?? "Could not disconnect. Try again.");
       await load();
     } catch (e) {
@@ -120,7 +126,13 @@ export function EmailTab({ outcome }: { outcome?: string }) {
           <button className="approve" type="button" onClick={() => checkNow()} disabled={checking}>
             {checking ? "Checking your email…" : "Check now"}
           </button>
-          {run ? <RunSummary run={run} /> : !checking && <p className="empty">Tap Check now to sort your new email.</p>}
+          <div className="oi-switch" role="tablist" aria-label="Email">
+            <button type="button" role="tab" aria-selected={view === "items"} onClick={() => setView("items")}>Open items</button>
+            <button type="button" role="tab" aria-selected={view === "check"} onClick={() => setView("check")}>Latest check</button>
+          </div>
+          {view === "items" ? (
+            <OpenItems refreshKey={checks} lastLine={run?.openItems ? `Last check ${timeInNewJersey(run.at)}. ${run.openItems.line}.` : null} />
+          ) : run ? <RunSummary run={run} /> : !checking && <p className="empty">Tap Check now to sort your new email.</p>}
         </>
       )}
     </main>

@@ -1,6 +1,7 @@
 import { checkAnswers, type Classifier, type Deal, type ThreadAnswer } from "./classify";
 import type { Known } from "./people";
 import type { NoiseKind } from "./noise";
+import type { RunInput } from "./open-items";
 import type { MailSource, Person } from "./source";
 import { sortMail } from "./threads";
 
@@ -26,6 +27,7 @@ export interface RunItem {
   webLink: string | null;
   lead: ThreadAnswer["lead"];
   inMonday: Known["inMonday"][]; // people on the thread already in Monday
+  num?: number | null; // its open item, when it has one
 }
 
 export interface NewContact {
@@ -47,6 +49,7 @@ export interface Run {
   items: RunItem[];
   newContacts: NewContact[];
   mondayChecked: boolean;
+  openItems?: { line: string; droppingToday: number[]; closed: { num: number; by: string }[] };
 }
 
 export interface MonitorState {
@@ -107,7 +110,7 @@ export function orderItems(items: RunItem[]): RunItem[] {
     || IMPORTANCE_ORDER[a.importance] - IMPORTANCE_ORDER[b.importance]);
 }
 
-export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ run: Run; state: MonitorState }> {
+export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ run: Run; state: MonitorState; forItems: RunInput }> {
   const now = (deps.now ?? (() => new Date()))();
   const start = windowStart(state, now);
   const messages = await deps.source.messagesSince(start);
@@ -190,5 +193,9 @@ export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ ru
   for (const [id, at] of Object.entries(state.seen)) if (new Date(at).getTime() >= cutoff) nextSeen[id] = at;
   for (const m of messages) if (m.folder === "inbox" && !nextSeen[m.id]) nextSeen[m.id] = now.toISOString();
 
-  return { run, state: { lastRunEnd: now.toISOString(), seen: nextSeen } };
+  return {
+    run,
+    state: { lastRunEnd: now.toISOString(), seen: nextSeen },
+    forItems: { now, owner, messages, threads: sorted.threads, answers: checked, dealName },
+  };
 }

@@ -282,3 +282,31 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .chip.importance-fyi { background: var(--ground); color: var(--muted); }
 .email-contacts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .email-contacts li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+
+/* Open items (email monitor step 4) */
+.oi-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.oi-switch button { min-height: 38px; border: 0; border-radius: 10px; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.oi-switch button[aria-selected="true"] { background: var(--navy); color: #fff; }
+.oi-filters { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.oi-filter { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; line-height: 1.2; text-align: center; }
+.oi-filter strong { font-size: 18px; color: var(--ink); }
+.oi-filter[aria-pressed="true"] { border-color: var(--navy); background: var(--navy-tint); color: var(--navy); }
+@media (max-width: 520px) { .oi-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.oi-drop { display: flex; flex-direction: column; gap: 10px; background: var(--bad-bg); border: 2px solid var(--bad); border-radius: 16px; padding: 12px 14px; color: var(--bad); font-size: 14px; line-height: 1.45; }
+.oi-drop .approve { height: 44px; font-size: 15px; border-radius: 12px; }
+.oi-calm { margin: 0; background: var(--ok-bg); color: var(--ok); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+.oi-count { color: var(--faint); font-weight: 700; }
+.oi-item-drop { border-color: var(--bad); }
+.oi-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; width: 100%; padding: 12px 14px 6px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.oi-num { font-size: 13px; font-weight: 800; color: var(--faint); padding-top: 2px; }
+.oi-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.oi-title { font-size: 15px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.oi-sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.oi-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.oi-age { font-size: 12px; font-weight: 700; color: var(--faint); }
+.oi-email { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 10px 42px; font-size: 13px; font-weight: 700; }
+.oi-history { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.oi-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.oi-actions .approve, .oi-actions .secondary { height: 44px; padding: 0 16px; border-radius: 12px; font-size: 15px; }
+.oi-actions .approve { flex: 1 1 100%; }
+@media (min-width: 900px) { .oi-actions .approve { flex: 0 0 auto; } }

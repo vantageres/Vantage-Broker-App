@@ -53,7 +53,7 @@ function Item({ item }: { item: RunItem }) {
   return (
     <article className="card email-item">
       <div className="card-head">
-        <span className="title" style={{ fontSize: 16 }}>{item.title}</span>
+        <span className="title" style={{ fontSize: 16 }}>{item.num ? <span className="oi-num">#{item.num} </span> : null}{item.title}</span>
         <span className={`chip importance-${item.importance}`}>{item.importance === "fyi" ? "FYI" : item.importance === "high" ? "HIGH" : "NORMAL"}</span>
       </div>
       <div className="email-body">
