@@ -3,6 +3,8 @@
 import type { Run, RunItem } from "@/lib/email/run";
 import { timeInNewJersey } from "@/lib/time";
 import { Out } from "../icons";
+import { ADDABLE_BINS } from "@/lib/email/add-to-monday";
+import { AddToMonday } from "./AddToMonday";
 
 // One run's new mail, grouped Leads, Deals, Other, Internal Brokers,
 // Internal Staff. Everything from Claude is shown as plain text.
@@ -71,6 +73,7 @@ function Item({ item }: { item: RunItem }) {
             {item.lead.phone && <a href={`tel:${item.lead.phone.replace(/[^\d+]/g, "")}`}>{item.lead.phone}</a>}
             {item.lead.asked_about && <span className="inline-msg">Asked about: {item.lead.asked_about}</span>}
             <span className="inline-msg">{item.lead.proposed_contact_type === "Ask" ? "Contact Type unclear" : item.lead.proposed_contact_type} · {item.lead.proposed_source}</span>
+            <AddToMonday target={{ conversationId: item.conversationId }} />
           </div>
         )}
         {item.inMonday.map((m) => m && (
@@ -128,6 +131,7 @@ export function RunSummary({ run }: { run: Run }) {
               <li key={c.email}>
                 <span>{c.name ?? c.email}{c.company ? `, ${c.company}` : ""}</span>
                 <span className="inline-msg">{c.email} · {c.proposedBin}{c.confidence === "low" ? " (not sure)" : ""}</span>
+                {(ADDABLE_BINS as readonly string[]).includes(c.proposedBin) && <AddToMonday target={{ email: c.email }} />}
               </li>
             ))}
           </ul>

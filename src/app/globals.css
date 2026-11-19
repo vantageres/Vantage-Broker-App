@@ -312,3 +312,14 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 @media (min-width: 900px) { .oi-actions .approve { flex: 0 0 auto; } }
 /* Email links take only the width of their text, not the whole card. */
 .oi-email, .email-open, .email-body > a.open-link { align-self: flex-start; }
+
+/* Add to Monday (email monitor step 5) */
+.add-monday { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.add-monday > .secondary { align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 12px; color: var(--navy); border-color: var(--chip-line); }
+.add-monday-known { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.45; }
+.add-monday-known p { margin: 0; }
+.add-monday-known ul { margin: 0; padding-left: 18px; }
+.add-monday-known .open-link { align-self: flex-start; padding: 0; }
+.add-monday-card { margin: 6px -12px 0; }
+.add-monday-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.add-monday-field input { height: 40px; border: 1px solid var(--control); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 15px; color: var(--ink); }
