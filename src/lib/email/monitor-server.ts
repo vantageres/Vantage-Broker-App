@@ -12,6 +12,10 @@ import { claudeHistorian, savedHistorian, type Historian } from "./history";
 import { dueSlot, nextFullList, upcomingDates, waitingOnThem, type RunKind, type Slot } from "./schedule";
 import { runCheck, type ItemLine, type MonitorState, type Run } from "./run";
 import { sealer } from "./server";
+import { mondayClient } from "../monday/client";
+import { MONDAY_ACCOUNT_SLUG } from "../monday/boards";
+import { refreshTokens } from "../monday/oauth";
+import { mondayTokensFor } from "./monday-link";
 import { devMailboxFile, fileSource, outlookSource, type MailSource, type Person } from "./source";
 
 // Wires a run to the real pieces: the broker's mail (Outlook, or the
@@ -116,10 +120,12 @@ export function tapItem(userId: string, num: number, action: TapAction, version:
   });
 }
 
-// Who a run is for. Check now has the broker's Monday sign-in; a scheduled
-// run has none (Monday tokens live only in the broker's own cookie), so it
-// reads mail, sorts it and keeps Open Items current without Monday: people
-// are known from the directory, and deals are the directory's properties.
+// Who a run is for. Check now has the broker's Monday sign-in from their
+// cookie; a scheduled run uses the copy kept for it (monday-link.ts). With
+// neither (never signed in since, or Monday refused), the run still reads
+// mail, sorts it and keeps Open Items current without Monday: people are
+// known from the directory, deals are the directory's properties, and the
+// report says Monday wasn't read.
 interface RunFor {
   userId: string;
   brokerName: string;
@@ -238,10 +244,27 @@ async function followUps(f: RunFor, source: MailSource, bins: Map<string, string
   }
 }
 
-// Development: run now as the schedule would (no Monday), to try the 7am and
-// changes views without waiting for the slot.
-export function tryScheduledRun(userId: string, brokerName: string, kind: "full" | "changes"): Promise<Run> {
-  return runAndSave({ userId, brokerName, monday: null, kind, slot: kind === "full" ? "07:00" : "11:00" });
+// Monday as the broker for a scheduled run: their kept sign-in, renewed if
+// needed. In development, a personal token (MONDAY_DEV_TOKEN) stands in, with
+// writes limited to the test workspace as everywhere else.
+export async function mondayContextFor(userId: string, fallbackName: string): Promise<Context | null> {
+  try {
+    const kept = await mondayTokensFor({ store: getStore(), sealer, refresh: (t) => refreshTokens(t) }, userId);
+    if (kept) return { monday: mondayClient(kept.tokens.accessToken), sid: "scheduled", accountSlug: kept.accountSlug, me: { id: userId, name: kept.name } };
+  } catch (error) {
+    console.error(`[email] Monday not read for a scheduled run: ${error instanceof Error ? error.constructor.name : "unknown"}`);
+  }
+  if (process.env.NODE_ENV !== "production" && process.env.MONDAY_DEV_TOKEN) {
+    return { monday: mondayClient(), sid: "scheduled", accountSlug: MONDAY_ACCOUNT_SLUG, me: { id: userId, name: fallbackName } };
+  }
+  return null;
+}
+
+// Development: run now as the schedule would, to try the 7am and changes
+// views without waiting for the slot.
+export async function tryScheduledRun(userId: string, brokerName: string, kind: "full" | "changes"): Promise<Run> {
+  const monday = await mondayContextFor(userId, brokerName);
+  return runAndSave({ userId, brokerName: monday?.me.name ?? brokerName, monday, kind, slot: kind === "full" ? "07:00" : "11:00" });
 }
 
 // ---- Scheduled runs ----
@@ -281,7 +304,8 @@ export async function runDueSlot(now = new Date(), users = process.env.EMAIL_MON
       continue;
     }
     try {
-      await runAndSave({ userId, brokerName, monday: null, kind: due.kind, slot: due.slot });
+      const monday = await mondayContextFor(userId, brokerName);
+      await runAndSave({ userId, brokerName: monday?.me.name ?? brokerName, monday, kind: due.kind, slot: due.slot });
       results.push({ userId, outcome: "ran" });
     } catch (error) {
       await store.del(key);

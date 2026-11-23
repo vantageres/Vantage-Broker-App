@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { applyTokens, getSession, unsealTokens } from "@/lib/session";
+import { rememberMonday } from "@/lib/email/monday-link-server";
 import { collectPairing } from "@/lib/link";
 import { getStore } from "@/lib/store";
 import { MONDAY_ACCOUNT_SLUG } from "@/lib/monday/boards";
@@ -29,6 +30,7 @@ export async function GET() {
       sid: randomBytes(16).toString("hex"),
     });
     await session.save();
+    await rememberMonday(session); // email monitor brokers only: lets scheduled runs read Monday as them
     return NextResponse.json({ status: "signed-in", name: result.name });
   } catch (error) {
     return fail(error, 500);

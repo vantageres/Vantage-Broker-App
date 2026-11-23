@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { applyTokens, getSession, safePath, sealTokens } from "@/lib/session";
+import { rememberMonday } from "@/lib/email/monday-link-server";
 import { exchangeCode } from "@/lib/monday/oauth";
 import { MondayError, mondayClient } from "@/lib/monday/client";
 import { whoAmI } from "@/lib/monday/me";
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
     applyTokens(session, tokens);
     Object.assign(session, who, clear, { sid: randomBytes(16).toString("hex"), returnTo: undefined });
     await session.save();
+    await rememberMonday(session); // email monitor brokers only: lets scheduled runs read Monday as them
     return NextResponse.redirect(new URL(returnTo, url));
   } catch (error) {
     const details = error instanceof MondayError && error.details ? ` ${JSON.stringify(error.details)}` : "";

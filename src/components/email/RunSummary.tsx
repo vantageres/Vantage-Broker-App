@@ -114,7 +114,7 @@ export function RunSummary({ run }: { run: Run }) {
       {!run.mondayChecked && (
         <p className={run.kind === "full" || run.kind === "changes" ? "inline-msg" : "alert"} role="status">
           {run.kind === "full" || run.kind === "changes"
-            ? "Scheduled checks don't read Monday, so people already in Monday aren't marked and Property Leads don't group the mail. Check now does both."
+            ? "This scheduled check couldn't read Monday, so people already in Monday aren't marked and Property Leads don't group the mail. Opening the app lets the next one read Monday; if it keeps happening, sign out and back in."
             : "Monday didn't respond, so people already in Monday aren't marked this time."}
         </p>
       )}

@@ -4,6 +4,7 @@ import { mondayClient, type MondayClient } from "./monday/client";
 import { refreshTokens, type Tokens } from "./monday/oauth";
 import { renewShared } from "./renewal";
 import { getStore } from "./store";
+import { planBrowserRenewal, rememberMonday } from "./email/monday-link-server";
 
 // The broker's sign-in lives in an encrypted, http-only cookie so it persists
 // on the phone. It holds the broker's own Monday tokens: every Monday call is
@@ -87,11 +88,20 @@ export function safePath(next: string | null | undefined): string {
 }
 
 // One renewal at a time per sign-in, across every server copy (see renewal.ts).
+// For brokers on the email monitor list, scheduled runs keep a copy of the
+// Monday sign-in and may have renewed it already: then the newer tokens are
+// used instead (email/monday-link.ts), and every renewal is saved back.
 async function renew(session: IronSession<BrokerSession>): Promise<boolean> {
   if (!session.refreshToken) return false;
   const password = sessionOptions().password as string;
   try {
-    const tokens = await renewShared(session.refreshToken, {
+    const plan = await planBrowserRenewal(session);
+    if (plan.kind === "adopt") {
+      applyTokens(session, plan.tokens);
+      await session.save();
+      return true;
+    }
+    const tokens = await renewShared(plan.kind === "renew-from" ? plan.refreshToken : session.refreshToken, {
       store: getStore(),
       refresh: refreshTokens,
       seal: (t) => sealData(t, { password, ttl: 300 }),
@@ -99,6 +109,7 @@ async function renew(session: IronSession<BrokerSession>): Promise<boolean> {
     });
     applyTokens(session, tokens);
     await session.save();
+    await rememberMonday(session);
     return true;
   } catch (error) {
     console.error(`[sign-in] renewal failed: ${error instanceof Error ? error.message : "unknown"}`);

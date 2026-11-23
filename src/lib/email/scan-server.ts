@@ -10,6 +10,7 @@ import {
   propertyLeadDraft, shortlist, type Binner, type Counted, type Directory, type DirTap, type KnownProperty, type Proposed,
 } from "./scan";
 import { sealer } from "./server";
+import { forgetMondayLink } from "./monday-link";
 import { claudeBinner, savedBinner } from "./binner";
 import { deleteDirectoryOnly, directoryFor, saveDirectory } from "./directory-store";
 
@@ -172,8 +173,10 @@ export async function tapDirectory(userId: string, tap: DirTap): Promise<Directo
   return next;
 }
 
-// Turning the module off (Disconnect) deletes the directory and any scan.
+// Turning the module off (Disconnect) deletes the directory, any scan, and the
+// Monday sign-in kept for scheduled runs.
 export async function deleteDirectory(userId: string) {
+  await forgetMondayLink(getStore(), userId); // the Monday sign-in kept for scheduled runs
   await deleteDirectoryOnly(userId);
   await getStore().del(scanKey(userId));
 }
