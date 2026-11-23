@@ -339,3 +339,10 @@ textarea.field { height: auto; min-height: 88px; padding: 10px 12px; line-height
 .scan-actions .secondary { height: 40px; padding: 0 14px; border-radius: 12px; }
 .scan-pages { display: flex; justify-content: space-between; align-items: center; }
 .email-run > .secondary { align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 12px; }
+
+/* Scheduled runs (email monitor step 7) */
+.email-run-title { margin: 0; font-size: 17px; font-weight: 800; color: var(--navy); }
+.run-lines ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.run-lines li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.run-lines-bad li { border-color: var(--bad); background: var(--bad-bg); color: var(--bad); }
+.email-dev-actions { display: flex; gap: 14px; flex-wrap: wrap; }

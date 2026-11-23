@@ -48,11 +48,11 @@ export function EmailTab({ outcome }: { outcome?: string }) {
       .catch(() => {});
   }, [connected]);
 
-  async function checkNow(reset = false) {
+  async function checkNow(reset = false, as?: "full" | "changes") {
     setChecking(true);
     setError(null);
     try {
-      const res = await emailFetch("/api/email/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset }) });
+      const res = await emailFetch("/api/email/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset, as }) });
       const body = await res.json();
       if (!res.ok) {
         if (body.reconnect) await load();
@@ -118,7 +118,11 @@ export function EmailTab({ outcome }: { outcome?: string }) {
               {status.last24h && ` · ${status.last24h.capped ? "1,000 or more" : status.last24h.count.toLocaleString("en-US")} in the inbox in 24 hours`}
             </span>
             {status.dev ? (
-              <button className="link-btn" type="button" onClick={() => checkNow(true)} disabled={checking} style={{ marginTop: 0 }}>Start over</button>
+              <span className="email-dev-actions">
+                <button className="link-btn" type="button" onClick={() => checkNow(false, "full")} disabled={checking} style={{ marginTop: 0 }}>Try 7am run</button>
+                <button className="link-btn" type="button" onClick={() => checkNow(false, "changes")} disabled={checking} style={{ marginTop: 0 }}>Try 11am run</button>
+                <button className="link-btn" type="button" onClick={() => checkNow(true)} disabled={checking} style={{ marginTop: 0 }}>Start over</button>
+              </span>
             ) : (
               <button className="link-btn" type="button" onClick={disconnectOutlook} disabled={busy} style={{ marginTop: 0 }}>Disconnect</button>
             )}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withBroker } from "@/lib/api";
 import { emailMonitorAllowed } from "@/lib/email/access";
-import { checkNow, latestRun, NotConnected, resetMonitor } from "@/lib/email/monitor-server";
+import { checkNow, latestRun, NotConnected, resetMonitor, tryScheduledRun } from "@/lib/email/monitor-server";
 import { ReconnectNeeded } from "@/lib/email/connection";
 import { GraphError } from "@/lib/email/graph";
 import { ClassifyProblem } from "@/lib/email/classify";
@@ -20,9 +20,11 @@ export async function GET() {
 export async function POST(req: Request) {
   return withBroker(async (ctx) => {
     if (!emailMonitorAllowed(ctx.me.id)) return NextResponse.json({ error: "Not available." }, { status: 403 });
-    const body = (await req.json().catch(() => ({}))) as { reset?: boolean };
+    const body = (await req.json().catch(() => ({}))) as { reset?: boolean; as?: string };
     if (body.reset && devMailboxFile()) await resetMonitor(ctx.me.id);
     try {
+      // Development only: run as the 7am or 11am schedule would.
+      if (devMailboxFile() && (body.as === "full" || body.as === "changes")) return NextResponse.json({ run: await tryScheduledRun(ctx.me.id, ctx.me.name, body.as) });
       return NextResponse.json({ run: await checkNow(ctx) });
     } catch (error) {
       if (error instanceof NotConnected || error instanceof ReconnectNeeded) return NextResponse.json({ error: error.message, reconnect: true }, { status: 409 });

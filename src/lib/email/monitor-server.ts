@@ -3,12 +3,14 @@ import { getStore } from "../store";
 import { BOARDS, peopleMatching, propertyLeadsFor, type Context } from "../capture/service";
 import { teamFor } from "../monday/team";
 import { claudeClassifier, savedClassifier, type Classifier } from "./classify";
-import { accessToken, getConnection } from "./connection";
+import { accessToken, getConnection, ReconnectNeeded } from "./connection";
 import { knownPeople, type Known } from "./people";
 import { directoryFor } from "./directory-store";
 import { directoryBins, directoryDeals } from "./scan";
-import { applyRun, applyTap, changeLine, emptyItems, type ItemsState, type TapAction, type TapResult } from "./open-items";
-import { runCheck, type MonitorState, type Run } from "./run";
+import { applyRun, applyTap, changeLine, emptyItems, GROUP_ORDER, nyDate, viewOf, type ItemGroup, type ItemsState, type TapAction, type TapResult } from "./open-items";
+import { claudeHistorian, savedHistorian, type Historian } from "./history";
+import { dueSlot, nextFullList, upcomingDates, waitingOnThem, type RunKind, type Slot } from "./schedule";
+import { runCheck, type ItemLine, type MonitorState, type Run } from "./run";
 import { sealer } from "./server";
 import { devMailboxFile, fileSource, outlookSource, type MailSource, type Person } from "./source";
 
@@ -114,38 +116,180 @@ export function tapItem(userId: string, num: number, action: TapAction, version:
   });
 }
 
-export async function checkNow(ctx: Context): Promise<Run> {
-  const source = await mailSourceFor(ctx.me.id);
-  const state = (await readSealed<MonitorState>(stateKey(ctx.me.id))) ?? { seen: {} };
+// Who a run is for. Check now has the broker's Monday sign-in; a scheduled
+// run has none (Monday tokens live only in the broker's own cookie), so it
+// reads mail, sorts it and keeps Open Items current without Monday: people
+// are known from the directory, and deals are the directory's properties.
+interface RunFor {
+  userId: string;
+  brokerName: string;
+  monday: Context | null;
+  kind: RunKind;
+  slot?: Slot;
+}
+
+export function checkNow(ctx: Context): Promise<Run> {
+  return runAndSave({ userId: ctx.me.id, brokerName: ctx.me.name, monday: ctx, kind: "manual" });
+}
+
+export function historianFor(env = process.env): Historian | undefined {
+  if (env.NODE_ENV !== "production" && env.DEV_HISTORY_FILE) return savedHistorian(env.DEV_HISTORY_FILE);
+  if (env.NODE_ENV !== "production" && env.DEV_CLASSIFICATION_FILE) return undefined; // saved answers, no Claude: no history lines
+  return env.BROKER_APP_ANTHROPIC_KEY ? claudeHistorian(new Anthropic({ apiKey: env.BROKER_APP_ANTHROPIC_KEY, authToken: null })) : undefined;
+}
+
+async function runAndSave(f: RunFor): Promise<Run> {
+  const source = await mailSourceFor(f.userId);
+  const state = (await readSealed<MonitorState>(stateKey(f.userId))) ?? { seen: {} };
   // The broker's directory (first-time scan): kept contacts' types fill in
   // for people Monday doesn't know, and kept properties group mail as deals.
-  const directory = await directoryFor(ctx.me.id);
+  const directory = await directoryFor(f.userId);
   const bins = directoryBins(directory);
+  const withDirectory = (people: Person[], known: Map<string, Known>) => {
+    for (const p of people) {
+      const bin = bins.get(p.address);
+      if (bin && !known.has(p.address)) known.set(p.address, { bin } satisfies Known);
+    }
+    return known;
+  };
+  const ctx = f.monday;
   const { run, state: next, forItems } = await runCheck({
     source,
     classify: classifierFor(),
-    brokerName: ctx.me.name,
-    deals: async () => [...(await propertyLeadsFor(ctx)).map((l) => ({ id: l.id, name: l.name })), ...directoryDeals(directory)],
+    brokerName: f.brokerName,
+    history: historianFor(),
+    monday: !!ctx,
+    deals: async () => [...(ctx ? (await propertyLeadsFor(ctx)).map((l) => ({ id: l.id, name: l.name })) : []), ...directoryDeals(directory)],
     lookup: async (people) => {
+      if (!ctx) return withDirectory(people, knownPeople(people, [], []));
       const known = await lookupInMonday(ctx, people);
-      if (!known) return null;
-      for (const p of people) {
-        const bin = bins.get(p.address);
-        if (bin && !known.has(p.address)) known.set(p.address, { bin } satisfies Known);
-      }
-      return known;
+      return known ? withDirectory(people, known) : null;
     },
   }, state);
-  const outcome = await withItems(ctx.me.id, async (items) => {
+  const outcome = await withItems(f.userId, async (items) => {
     const o = applyRun(items, forItems);
     return { items: o.state, result: o };
   });
   for (const item of run.items) item.num = outcome.nums[item.conversationId] ?? null;
-  run.openItems = { line: changeLine(outcome), droppingToday: outcome.changes.droppingToday, closed: outcome.changes.closed };
+
+  const now = forItems.now;
+  const today = nyDate(now);
+  const items = outcome.state.items;
+  const byNum = new Map(items.map((i) => [i.num, i]));
+  const line = (num: number, extra: Partial<ItemLine> = {}): ItemLine => {
+    const i = byNum.get(num);
+    return { num, title: i?.title ?? `#${num}`, tag: i ? viewOf(i, today).tag : null, ...extra };
+  };
+  const open = items.filter((i) => i.state === "open");
+  const views = open.map((i) => ({ i, v: viewOf(i, today) }));
+  run.openItems = {
+    line: changeLine(outcome),
+    droppingToday: outcome.changes.droppingToday,
+    closed: outcome.changes.closed,
+    open: open.length,
+    high: views.filter(({ v }) => v.group === "high").length,
+    changes: {
+      added: outcome.changes.added.map((n) => line(n)),
+      closed: outcome.changes.closed.map((c) => line(c.num, { by: c.by })),
+      upgraded: outcome.changes.upgraded.map((n) => line(n)),
+      pastDue: outcome.changes.pastDue.map((n) => line(n)),
+      // Dropping soon is listed in every run while an item is at age 8 or 9 (spec 02).
+      dropping: views.filter(({ v }) => v.group === "dropping" && !v.droppingToday).map(({ i }) => line(i.num)),
+      droppingToday: outcome.changes.droppingToday.map((n) => line(n)),
+    },
+  };
+  run.kind = f.kind;
+  if (f.slot) run.slot = f.slot;
+  run.nextFullList = nextFullList(now);
+  if (f.kind === "full") {
+    const order: ItemGroup[] = GROUP_ORDER.filter((g) => g !== "closed" && g !== "snoozed");
+    run.openItems.openList = views
+      .filter(({ v }) => order.includes(v.group))
+      .sort((a, b) => order.indexOf(a.v.group) - order.indexOf(b.v.group) || a.v.daysLeft - b.v.daysLeft || a.i.num - b.i.num)
+      .map(({ i }) => line(i.num));
+    run.followUps = await followUps(f, source, bins, items, now);
+  }
+
   const store = getStore();
-  await store.set(runKey(ctx.me.id), await sealer.seal(run), { px: RUN_TTL_MS });
-  await store.set(stateKey(ctx.me.id), await sealer.seal(next), { px: STATE_TTL_MS });
+  await store.set(runKey(f.userId), await sealer.seal(run), { px: RUN_TTL_MS });
+  await store.set(stateKey(f.userId), await sealer.seal(next), { px: STATE_TTL_MS });
   return run;
+}
+
+// 7am follow-ups (spec 02 step 7): Waiting on them, from the last 10 business
+// days of Sent mail, and Upcoming dates from open items. A failure leaves the
+// list out; the run still saves.
+async function followUps(f: RunFor, source: MailSource, bins: Map<string, string>, items: ItemsState["items"], now: Date): Promise<NonNullable<Run["followUps"]>> {
+  const upcoming = upcomingDates(items, now);
+  try {
+    const since = new Date(now.getTime() - 16 * 24 * 60 * 60 * 1000); // covers 10 business days
+    const messages = await (source.scanSince ? source.scanSince(since) : source.messagesSince(since));
+    let monday: Map<string, Known> | null = null;
+    if (f.monday) {
+      const people = new Map<string, Person>();
+      for (const m of messages) if (m.folder === "sent") for (const p of m.to) people.set(p.address, p);
+      monday = await lookupInMonday(f.monday, [...people.values()]);
+    }
+    const waiting = waitingOnThem(messages, source.owner, (email) => monday?.get(email)?.bin ?? bins.get(email), now);
+    return { waiting, upcoming };
+  } catch (error) {
+    console.error(`[email] follow-ups skipped: ${error instanceof Error ? error.constructor.name : "unknown"}`);
+    return { waiting: [], upcoming };
+  }
+}
+
+// Development: run now as the schedule would (no Monday), to try the 7am and
+// changes views without waiting for the slot.
+export function tryScheduledRun(userId: string, brokerName: string, kind: "full" | "changes"): Promise<Run> {
+  return runAndSave({ userId, brokerName, monday: null, kind, slot: kind === "full" ? "07:00" : "11:00" });
+}
+
+// ---- Scheduled runs ----
+
+const slotKey = (userId: string, date: string, slot: Slot) => `email:slot:${userId}:${date}:${slot}`;
+
+export interface SlotResult {
+  userId: string;
+  outcome: "ran" | "already ran" | "not connected" | "reconnect needed" | "failed";
+}
+
+// Everyone on the email monitor list, for the slot due now. Each broker's
+// slot runs once (a store marker), so a late or repeated cron never runs it
+// twice; a failed run clears its marker so the next firing can try again.
+export async function runDueSlot(now = new Date(), users = process.env.EMAIL_MONITOR_USERS): Promise<{ slot: string | null; results: SlotResult[] }> {
+  const due = dueSlot(now);
+  if (!due) return { slot: null, results: [] };
+  const store = getStore();
+  const results: SlotResult[] = [];
+  for (const userId of (users ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+    let brokerName = "the broker";
+    if (!devMailboxFile()) {
+      const conn = await getConnection({ store }, userId);
+      if (!conn) {
+        results.push({ userId, outcome: "not connected" });
+        continue;
+      }
+      if (conn.reconnectNeeded) {
+        results.push({ userId, outcome: "reconnect needed" });
+        continue;
+      }
+      brokerName = conn.name;
+    }
+    const key = slotKey(userId, due.date, due.slot);
+    if (!(await store.set(key, 1, { px: 2 * 24 * 60 * 60 * 1000, nx: true }))) {
+      results.push({ userId, outcome: "already ran" });
+      continue;
+    }
+    try {
+      await runAndSave({ userId, brokerName, monday: null, kind: due.kind, slot: due.slot });
+      results.push({ userId, outcome: "ran" });
+    } catch (error) {
+      await store.del(key);
+      console.error(`[email] scheduled run failed: ${error instanceof Error ? error.constructor.name : "unknown"}`);
+      results.push({ userId, outcome: error instanceof ReconnectNeeded ? "reconnect needed" : "failed" });
+    }
+  }
+  return { slot: `${due.date} ${due.slot}`, results };
 }
 
 // Development: start again from an empty state, so the made-up mail is sorted afresh.

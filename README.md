@@ -22,6 +22,7 @@ Settings, in `.env.local` for development or the host's settings in production:
 | `OPERATIONS_MANAGER_IDS` | Monday user ids, comma-separated, allowed to change approval settings at `/admin/approvals`. |
 | `EMAIL_MONITOR_USERS` | Monday user ids, comma-separated, who see the Email tab while it is built (`docs/email-monitor-plan.md`). Unset: nobody. |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT_ID` | The Entra app registration for Connect Outlook (Web platform, delegated `Mail.Read`, `User.Read`, `openid`, `offline_access`). Its redirect URI is `APP_URL/api/email/callback`. |
+| `CRON_SECRET` | Random text Vercel Cron sends to `/api/email/cron` (set it in Vercel; Vercel adds it to the request). Scheduled email runs need it and a paid Vercel plan (`vercel.json` runs the cron every 15 minutes). |
 
 Development only (ignored in production):
 
@@ -33,6 +34,7 @@ Development only (ignored in production):
 | `DEV_MAILBOX_FILE` | A file of emails that stands in for Outlook in the Email tab, e.g. `src/lib/email/fixtures/sample-mailbox.json` (made up). |
 | `DEV_CLASSIFICATION_FILE` | Saved answers used instead of calling Claude to sort email, e.g. `src/lib/email/fixtures/sample-classification.json`. |
 | `DEV_SCAN_FILE` | Saved answers used instead of calling Claude in the first-time scan (Email tab, Contacts), e.g. `src/lib/email/fixtures/sample-scan.json`. |
+| `DEV_HISTORY_FILE` | Saved history lines (one line of background per email) used instead of calling Claude, e.g. `src/lib/email/fixtures/sample-history.json`. |
 
 Phones sign in from a computer: Monday's sign-in page doesn't work in a phone browser, so the phone shows a code and the broker enters it at `/link` on a computer (see `src/lib/link.ts`).
 

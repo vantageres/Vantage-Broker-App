@@ -2,6 +2,8 @@ import { checkAnswers, type Classifier, type Deal, type ThreadAnswer } from "./c
 import type { Known } from "./people";
 import type { NoiseKind } from "./noise";
 import type { RunInput } from "./open-items";
+import { earlierFor, HISTORY_DAYS, HISTORY_MAX_THREADS, NOT_CHECKED, type Historian, type HistoryAsk } from "./history";
+import type { RunKind, Slot, Waiting } from "./schedule";
 import type { MailSource, Person } from "./source";
 import { sortMail } from "./threads";
 
@@ -28,6 +30,14 @@ export interface RunItem {
   lead: ThreadAnswer["lead"];
   inMonday: Known["inMonday"][]; // people on the thread already in Monday
   num?: number | null; // its open item, when it has one
+  history?: string | null; // one line of background (High and Normal), or "not checked this run"
+}
+
+export interface ItemLine {
+  num: number;
+  title: string;
+  tag?: string | null;
+  by?: string; // how it closed
 }
 
 export interface NewContact {
@@ -49,7 +59,20 @@ export interface Run {
   items: RunItem[];
   newContacts: NewContact[];
   mondayChecked: boolean;
-  openItems?: { line: string; droppingToday: number[]; closed: { num: number; by: string }[] };
+  openItems?: {
+    line: string;
+    droppingToday: number[];
+    closed: { num: number; by: string }[];
+    // What changed (every run) and, at 7am, the whole open list.
+    changes?: { added: ItemLine[]; closed: ItemLine[]; upgraded: ItemLine[]; pastDue: ItemLine[]; dropping: ItemLine[]; droppingToday: ItemLine[] };
+    openList?: ItemLine[];
+    open?: number;
+    high?: number;
+  };
+  kind?: RunKind; // manual (Check now), or a scheduled full (7am) or changes run
+  slot?: Slot;
+  followUps?: { waiting: Waiting[]; upcoming: { num: number; title: string; due: string }[] }; // 7am only
+  nextFullList?: string;
 }
 
 export interface MonitorState {
@@ -64,6 +87,8 @@ export interface RunDeps {
   deals: () => Promise<Deal[]>;
   // Who the addresses are (Monday, internal domains). Null when Monday could not be read.
   lookup: (people: Person[]) => Promise<Map<string, Known> | null>;
+  history?: Historian; // history lines; left out, items say "not checked this run"
+  monday?: boolean; // false for scheduled runs, which can't read Monday (people come from the directory only)
   now?: () => Date;
 }
 
@@ -167,6 +192,7 @@ export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ ru
     });
   }
 
+  await addHistory(deps, items, threadById, now);
   const ordered = orderItems(items);
   const noiseTotal = Object.values(noise).reduce((s, n) => s + (n ?? 0), 0);
   const run: Run = {
@@ -184,7 +210,7 @@ export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ ru
     noise,
     items: ordered,
     newContacts: [...contacts.values()],
-    mondayChecked: known !== null,
+    mondayChecked: known !== null && deps.monday !== false,
   };
 
   // Every received message in the window counts as seen, so the overlap never sorts it twice.
@@ -198,4 +224,23 @@ export async function runCheck(deps: RunDeps, state: MonitorState): Promise<{ ru
     state: { lastRunEnd: now.toISOString(), seen: nextSeen },
     forItems: { now, owner, messages, threads: sorted.threads, answers: checked, dealName },
   };
+}
+
+// History lines for up to 15 High and Normal items, Highs first (spec 02
+// step 5). A failure here never stops the run: the items say "not checked".
+async function addHistory(deps: RunDeps, items: RunItem[], threads: Map<string, import("./threads").Thread>, now: Date) {
+  const wanted = items.filter((i) => i.importance !== "fyi").sort((a, b) => Number(a.importance !== "high") - Number(b.importance !== "high"));
+  for (const i of wanted) i.history = NOT_CHECKED;
+  const conversation = deps.source.conversation?.bind(deps.source);
+  if (!deps.history || !conversation) return;
+  const since = new Date(now.getTime() - HISTORY_DAYS * 24 * 60 * 60 * 1000);
+  const picked = wanted.slice(0, HISTORY_MAX_THREADS);
+  try {
+    const asks: HistoryAsk[] = await Promise.all(picked.map(async (i) =>
+      earlierFor(threads.get(i.conversationId)!, await conversation(i.conversationId, since), `${i.title}. ${i.what}`)));
+    const lines = await deps.history(asks);
+    for (const i of picked) i.history = lines[i.conversationId] ?? NOT_CHECKED;
+  } catch (error) {
+    console.error(`[email] history lines skipped: ${error instanceof Error ? error.constructor.name : "unknown"}`);
+  }
 }

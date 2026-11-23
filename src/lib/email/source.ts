@@ -38,6 +38,9 @@ export interface MailSource {
   // For the first-time scan: like messagesSince, reaching further back. Up to
   // 1,000 messages per folder in Outlook. The file adds its older "history".
   scanSince?(since: Date): Promise<MailMessage[]>;
+  // Earlier messages in one conversation (received and sent), oldest first,
+  // with previews only: for the history line (spec 02 step 5).
+  conversation?(conversationId: string, since: Date): Promise<MailMessage[]>;
 }
 
 // ---- File (development) ----
@@ -89,6 +92,13 @@ export function fileSource(path: string, now: () => number = Date.now): MailSour
       const box = await load();
       owner = box.owner;
       return box.messages.filter((m) => m.at >= since.toISOString()).map(({ body: _body, ...rest }) => rest);
+    },
+    async conversation(conversationId, since) {
+      const box = await load();
+      return [...box.history, ...box.messages]
+        .filter((m) => m.conversationId === conversationId && m.at >= since.toISOString())
+        .map(({ body: _body, ...rest }) => rest)
+        .sort((a, b) => a.at.localeCompare(b.at));
     },
     async scanSince(since) {
       const box = await load();
@@ -173,6 +183,26 @@ export function outlookSource(token: string, owner: Person, deps: GraphDeps = {}
         at: m.sentDateTime ?? iso, preview: "", webLink: m.webLink,
       }));
       return [...inbox, ...out].sort((a, b) => a.at.localeCompare(b.at));
+    },
+    async conversation(conversationId, since) {
+      const skip = await folderIds();
+      const sentId = [...skip][0]; // folderIds() looks up Sent Items first
+      const filter = `conversationId eq '${conversationId.replace(/'/g, "''")}'`;
+      const list = await allPages<GraphMessage>(token,
+        `/me/messages?$filter=${encodeURIComponent(filter)}&$top=25&$select=id,conversationId,parentFolderId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,webLink`,
+        deps, 25);
+      return list
+        .filter((m) => !m.parentFolderId || m.parentFolderId === sentId || !skip.has(m.parentFolderId)) // no drafts, deleted or junk
+        .map((m): MailMessage => {
+          const sent = m.parentFolderId === sentId || graphPerson(m.from).address === owner.address;
+          return {
+            id: m.id, conversationId: m.conversationId, folder: sent ? "sent" : "inbox", subject: m.subject ?? "",
+            from: sent ? owner : graphPerson(m.from), to: (m.toRecipients ?? []).map(graphPerson), cc: (m.ccRecipients ?? []).map(graphPerson),
+            at: (sent ? m.sentDateTime : m.receivedDateTime) ?? m.receivedDateTime ?? "", preview: m.bodyPreview ?? "", webLink: m.webLink,
+          };
+        })
+        .filter((m) => m.at >= since.toISOString())
+        .sort((a, b) => a.at.localeCompare(b.at));
     },
     async bodies(ids) {
       const entries = await Promise.all(ids.map(async (id) => {
